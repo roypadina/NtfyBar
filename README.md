@@ -11,6 +11,7 @@
 [![CI](https://github.com/roypadina/NtfyBar/actions/workflows/ci.yml/badge.svg)](https://github.com/roypadina/NtfyBar/actions/workflows/ci.yml)
 [![Release](https://img.shields.io/github/v/release/roypadina/NtfyBar)](https://github.com/roypadina/NtfyBar/releases)
 [![Homebrew](https://img.shields.io/badge/Homebrew-roypadina%2Ftap-FBB040?logo=homebrew&logoColor=white)](#install)
+[![Website](https://img.shields.io/badge/website-apps.roypadina-2F62E6)](https://apps.roypadina.synology.me/apps/ntfybar/)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue)](LICENSE)
 [![Ko-fi](https://img.shields.io/badge/Ko--fi-support-F16061?logo=ko-fi&logoColor=white)](https://ko-fi.com/roypadina)
 [![PRs welcome](https://img.shields.io/badge/PRs-welcome-brightgreen)](CONTRIBUTING.md)
@@ -177,6 +178,15 @@ brew uninstall --cask ntfybar
 Then remove its data if you like: `~/Library/Application Support/NtfyBar/`
 (`brew uninstall --zap --cask ntfybar` does this for you). If you enabled **Launch at login**,
 switch it off first in Settings › General.
+
+## More Mac apps by Roy
+
+Free, open-source Mac menu-bar apps and terminal tools, all on one site: **[apps.roypadina.synology.me](https://apps.roypadina.synology.me/)**.
+
+- [MaccyPlus](https://apps.roypadina.synology.me/apps/maccyplus/) — Maccy, plus automation: rules, hotkeys, plugins and a CLI for AI agents.
+- [MeetAlert](https://apps.roypadina.synology.me/apps/meetalert/) — Meeting alerts you can't miss: a popup that stays, a phone push that escalates.
+- [SmartHiddenBar](https://apps.roypadina.synology.me/apps/smarthiddenbar/) — Hide the menu bar clutter. Reach it in one click.
+- [Window Organizer](https://apps.roypadina.synology.me/apps/window-organizer/) — Clear the desk in one keystroke.
 
 ## Support
 
