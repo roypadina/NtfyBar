@@ -160,7 +160,7 @@ NtfyBar needs no Accessibility, Full Disk or other special access.
 - **Topics are passwords.** On a public server anyone who knows a topic name can read and post to it. Use long random names (Settings has a **Random** button), and see the [ntfy docs](https://docs.ntfy.sh/publish/#message-caching) — ntfy.sh keeps messages for up to 12 hours.
 - **No telemetry, no analytics, no update checks.** NtfyBar connects only to the servers you configure, and to plugin marketplaces when you press Refresh or Install.
 - Topic names appear only in the topic editor and the config file; menus, popups, logs and plugins see your labels.
-- Plugins: see [Plugins](#plugins) for what they can and can't do.
+- Plugins: see [Plugins](#plugins) for what they can and can't do. Hiding topic names and server addresses from plugins is best-effort (text replacement — a sender who encodes them defeats it), and a plugin allowed to open links can send message text to a website in the URL. Grant permissions only to plugins you trust.
 
 ## Roadmap
 
