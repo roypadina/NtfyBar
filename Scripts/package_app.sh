@@ -19,13 +19,14 @@ RELEASE="${RELEASE:-}"
 
 cd "$ROOT_DIR"
 
-# -file-prefix-map: no build-machine paths in #file strings.
-swift build -c "$BUILD_CONFIG" -Xswiftc -file-prefix-map -Xswiftc "$ROOT_DIR=."
+# Universal (Apple Silicon + Intel). -file-prefix-map: no build-machine paths in #file strings.
+swift build -c "$BUILD_CONFIG" --arch arm64 --arch x86_64 -Xswiftc -file-prefix-map -Xswiftc "$ROOT_DIR=."
+BIN_DIR="$(swift build -c "$BUILD_CONFIG" --arch arm64 --arch x86_64 --show-bin-path)"
 
 rm -rf "$APP_DIR"
 mkdir -p "$MACOS_DIR" "$RESOURCES_DIR"
 
-cp ".build/$BUILD_CONFIG/NtfyBarApp" "$MACOS_DIR/$APP_NAME"
+cp "$BIN_DIR/NtfyBarApp" "$MACOS_DIR/$APP_NAME"
 cp Assets/icons/AppIcon.icns Assets/icons/menubar.png Assets/icons/menubar@2x.png "$RESOURCES_DIR/"
 cp -R Resources/BundledPlugins "$RESOURCES_DIR/BundledPlugins"
 find "$RESOURCES_DIR" -name .DS_Store -delete
