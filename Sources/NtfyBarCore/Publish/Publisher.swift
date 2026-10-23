@@ -65,6 +65,7 @@ public struct Publisher: Sendable {
         if let title = req.title { body["title"] = title }
         if !req.tags.isEmpty { body["tags"] = req.tags }
         if let click = req.click, SafeOpen.url(click) != nil { body["click"] = click }
+        if let delay = req.delay { body["delay"] = "\(delay)s" }
         return body
     }
 

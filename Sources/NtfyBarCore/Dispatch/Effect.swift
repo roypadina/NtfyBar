@@ -67,13 +67,17 @@ public struct PublishRequest: Equatable, Sendable {
     public var priority: Int
     public var tags: [String]
     public var click: String?
+    /// Seconds until ntfy delivers it (scheduled message); nil = now.
+    public var delay: Int?
 
-    public init(topicId: UUID, title: String? = nil, message: String, priority: Int = 3, tags: [String] = [], click: String? = nil) {
+    public init(topicId: UUID, title: String? = nil, message: String, priority: Int = 3, tags: [String] = [], click: String? = nil,
+                delay: Int? = nil) {
         self.topicId = topicId
         self.title = title
         self.message = message
         self.priority = priority
         self.tags = tags
         self.click = click
+        self.delay = delay
     }
 }

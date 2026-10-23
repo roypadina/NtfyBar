@@ -8,6 +8,9 @@ public struct PopupSpec: Equatable, Sendable {
     public var icon: String
     public var accent: PopupContent.Accent
     public var timeoutSec: Int?
+    /// nil = the trigger topic's own popup setting.
+    public var position: PopupSettings.Position?
+    public var level: PopupSettings.Level?
     public var blocks: [PopupContent.Block]
     public var buttons: [PopupButton]
     public var state: JSONValue
@@ -39,6 +42,16 @@ public struct PopupSpec: Equatable, Sendable {
         if let t = o["timeoutSec"] {
             guard let n = t.int, (0...600).contains(n), case .number = t else { throw fail("timeoutSec must be 0…600") }
             timeout = n
+        }
+        var position: PopupSettings.Position?
+        if let p = o["position"] {
+            guard let s = p.string, let parsed = PopupSettings.Position(rawValue: s) else { throw fail("position must be topCenter or topRight") }
+            position = parsed
+        }
+        var level: PopupSettings.Level?
+        if let l = o["level"] {
+            guard let s = l.string, let parsed = PopupSettings.Level(rawValue: s) else { throw fail("level must be floating or overFullScreen") }
+            level = parsed
         }
         var blocks: [PopupContent.Block] = []
         if let b = o["blocks"] {
@@ -85,17 +98,19 @@ public struct PopupSpec: Equatable, Sendable {
         }
         let state = o["state"] ?? .null
         guard state.jsonText.utf8.count <= maxState else { throw fail("state larger than 64 KB") }
-        return PopupSpec(title: title, icon: icon, accent: accent, timeoutSec: timeout, blocks: blocks, buttons: buttons, state: state)
+        return PopupSpec(title: title, icon: icon, accent: accent, timeoutSec: timeout, position: position, level: level,
+                         blocks: blocks, buttons: buttons, state: state)
     }
 
     /// The native popup for this spec. Plugin buttons report back to the plugin; Dismiss is always
     /// there and is the Return button unless the plugin marked one of its own as prominent.
-    public func content(key: String, label: String, pluginName: String, topicId: UUID?, messageId: String?) -> PopupContent {
+    public func content(key: String, label: String, pluginName: String, topicId: UUID?, messageId: String?,
+                        defaults: PopupSettings = PopupSettings()) -> PopupContent {
         var buttons = self.buttons.map { PopupContent.Button(id: $0.id, label: $0.label, style: $0.style, action: .plugin($0.id)) }
         let hasDefault = buttons.contains { $0.style == .prominent }
         buttons.append(PopupContent.Button(id: "dismiss", label: "Dismiss", style: hasDefault ? .default : .prominent, action: .dismiss))
         return PopupContent(key: key, header: "\(label) · \(pluginName)", date: Date(), priority: nil, icon: icon, accent: accent,
                             title: title, blocks: blocks, tags: [], attachment: nil, buttons: buttons, timeoutSec: timeoutSec ?? 0,
-                            level: .floating, position: .topCenter, topicId: topicId, messageId: messageId, copyText: nil)
+                            level: level ?? defaults.level, position: position ?? defaults.position, topicId: topicId, messageId: messageId, copyText: nil)
     }
 }

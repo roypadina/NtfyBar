@@ -46,7 +46,7 @@ public final class Engine {
 
     public init(store: ConfigStore = ConfigStore(), session: URLSession = Engine.makeSession(),
                 timing: NtfyStream.Timing = NtfyStream.Timing(), catchUpDebounce: Double = 2,
-                dispatcher: Dispatcher = Dispatcher(), bundledPlugins: URL? = nil, appVersion: String = "1.0.0",
+                dispatcher: Dispatcher = Dispatcher(), bundledPlugins: URL? = nil, appVersion: String = "1.1.0",
                 now: @escaping @Sendable () -> Date = { Date() }) throws {
         try store.ensureDirectory()
         self.store = store
@@ -283,7 +283,12 @@ public final class Engine {
             Log.publish.error("publish rate limit hit (\(rateKey, privacy: .public))")
             throw PublishError.rateLimited
         }
-        let priority = config.quietHours.cap(req.priority, at: now())
+        // Quiet hours apply to when the message will arrive.
+        let priority = config.quietHours.cap(req.priority, at: now().addingTimeInterval(Double(req.delay ?? 0)))
+        if req.delay != nil {
+            // A scheduled message is meant to come back and run rules (e.g. a snooze): no loop guard.
+            return try await publisher.publish(req, server: server, topic: topic.topic, priority: priority)
+        }
         let signature = Self.signature(topicId: req.topicId, title: req.title, message: req.message)
         pruneOwn()
         ownPending[signature] = now()

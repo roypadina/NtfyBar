@@ -9,19 +9,23 @@ public struct PluginPopupRequest: Equatable, Sendable {
     public var topicId: UUID
     public var messageId: String
     public var label: String
+    /// The trigger topic's popup settings: position/level when the plugin doesn't choose.
+    public var defaults: PopupSettings
 
-    public init(pluginId: String, pluginName: String, spec: PopupSpec, topicId: UUID, messageId: String, label: String) {
+    public init(pluginId: String, pluginName: String, spec: PopupSpec, topicId: UUID, messageId: String, label: String,
+                defaults: PopupSettings = PopupSettings()) {
         self.pluginId = pluginId
         self.pluginName = pluginName
         self.spec = spec
         self.topicId = topicId
         self.messageId = messageId
         self.label = label
+        self.defaults = defaults
     }
 
     public var content: PopupContent {
         var c = spec.content(key: "plugin-\(pluginId)-\(topicId.uuidString)-\(messageId)", label: label, pluginName: pluginName,
-                             topicId: topicId, messageId: messageId)
+                             topicId: topicId, messageId: messageId, defaults: defaults)
         c.plugin = PopupContent.PluginRef(pluginId: pluginId, state: spec.state)
         return c
     }
@@ -218,7 +222,7 @@ public final class PluginManager {
                     guard let spec = try runtime.action(function, ctx: ctx, params: params) else { return ActionOutput() }
                     return ActionOutput([.pluginPopup(PluginPopupRequest(pluginId: pluginId, pluginName: name, spec: spec,
                                                                          topicId: ctx.topic.id, messageId: ctx.message.ntfy.id,
-                                                                         label: ctx.label))])
+                                                                         label: ctx.label, defaults: ctx.topic.popup))])
                 }
             }
         }

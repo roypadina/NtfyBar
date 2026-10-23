@@ -279,9 +279,13 @@ public final class PluginRuntime {
         }
         var tags: [String] = []
         if case let .array(a)? = o["tags"] { tags = a.compactMap(\.string).prefix(10).map { String($0.prefix(64)) } }
-        let req = PublishRequest(topicId: topicId, title: o["title"]?.string.map { String($0.prefix(256)) }, message: message,
+        var req = PublishRequest(topicId: topicId, title: o["title"]?.string.map { String($0.prefix(256)) }, message: message,
                                  priority: min(5, max(1, o["priority"]?.int ?? 3)), tags: tags,
                                  click: SafeOpen.url(o["click"]?.string)?.absoluteString)
+        if let d = o["delay"] {
+            guard let n = d.int, (10...259_200).contains(n) else { fail("delay must be 10…259200 seconds"); return nil }
+            req.delay = n
+        }
         host.publish(pluginId: pluginId, req)
         return ok(.bool(true))
     }

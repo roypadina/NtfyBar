@@ -15,7 +15,7 @@ final class AppModel {
 
     private init() {
         do {
-            let version = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "1.0.0"
+            let version = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "1.1.0"
             engine = try Engine(bundledPlugins: Bundle.main.resourceURL?.appendingPathComponent("BundledPlugins"), appVersion: version)
         } catch {
             let alert = NSAlert()
@@ -81,7 +81,8 @@ final class AppModel {
         case let .replace(spec):
             guard let topicId = c.topicId, let messageId = c.messageId else { PopupPanel.dismiss(state); return }
             let req = PluginPopupRequest(pluginId: ref.pluginId, pluginName: engine.pluginName(ref.pluginId), spec: spec,
-                                         topicId: topicId, messageId: messageId, label: label(for: topicId))
+                                         topicId: topicId, messageId: messageId, label: label(for: topicId),
+                                         defaults: engine.config.topic(topicId)?.popup ?? PopupSettings())
             var next = req.content
             next.key = c.key
             state.content = next

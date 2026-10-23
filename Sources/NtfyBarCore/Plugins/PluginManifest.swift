@@ -21,7 +21,7 @@ public enum Permission: String, Codable, CaseIterable, Sendable, Comparable {
         switch self {
         case .historyRead: "Read earlier messages of the topic that triggered it."
         case .topicsRead: "See the labels of all your topics (and, with history access, their messages)."
-        case .publish: "Send messages to your topics — at most 10 a minute, capped by quiet hours."
+        case .publish: "Send messages to your topics, now or scheduled — at most 10 a minute, capped by quiet hours."
         case .clipboardWrite: "Put text on your clipboard."
         case .openURL: "Open web links (http/https) in your browser — a link can carry message text to that site."
         case .storage: "Keep up to 1 MB of its own data on this Mac."
@@ -127,7 +127,13 @@ public struct PluginManifest: Codable, Equatable, Sendable {
         if p.description.trimmingCharacters(in: .whitespaces).isEmpty || p.description.count > 120 { e.append("description is required (≤120 characters)") }
         if !Self.isIdentifier(p.function) { e.append("function must be a JavaScript identifier") }
         for param in p.params ?? [] {
-            if ![.text, .number, .bool, .topic].contains(param.kind) { e.append("param \(param.key): kind must be text, number, bool or topic") }
+            if param.kind == .choice {
+                let c = param.choices ?? []
+                if !(2...20).contains(c.count) || Set(c).count != c.count
+                    || c.contains(where: { $0.range(of: #"^[A-Za-z0-9_-]{1,40}$"#, options: .regularExpression) == nil }) {
+                    e.append("param \(param.key): choice needs 2–20 unique choices made of letters, digits, _ or -")
+                }
+            }
             if !Self.isIdentifier(param.key) { e.append("param key must be an identifier") }
         }
         return e
