@@ -30,7 +30,11 @@ enum Renderer {
             view = AnyView(HistoryView(model: model, engine: model.engine).frame(width: 640, height: 460))
         default:
             let tab = ProcessInfo.processInfo.environment["NTFYBAR_RENDER_TAB"] ?? "topics"
-            view = AnyView(SettingsView(model: model, engine: model.engine, initialTab: tab))
+            if tab == "consent", let pkg = model.engine.pluginPackages.first(where: { $0.manifest != nil }) {
+                view = AnyView(ConsentSheet(request: ConsentRequest(kind: .package(pkg)), onAllow: {}, onCancel: {}))
+            } else {
+                view = AnyView(SettingsView(model: model, engine: model.engine, initialTab: tab))
+            }
         }
         return write(view, to: url)
     }
