@@ -5,11 +5,11 @@ import UserNotifications
 /// macOS notifications. Only works from a bundled app — `swift run` has no bundle identifier and
 /// UNUserNotificationCenter would crash, so everything here is a no-op there.
 @MainActor
-final class Notifier: NSObject, UNUserNotificationCenterDelegate {
+final class Notifier: NSObject, ObservableObject, UNUserNotificationCenterDelegate {
     static let messageCategory = "ntfybar.message"
     static let summaryCategory = "ntfybar.summary"
 
-    private(set) var authorization: UNAuthorizationStatus = .notDetermined
+    @Published private(set) var authorization: UNAuthorizationStatus = .notDetermined
     private weak var model: AppModel?
 
     var isAvailable: Bool { Bundle.main.bundleIdentifier != nil }

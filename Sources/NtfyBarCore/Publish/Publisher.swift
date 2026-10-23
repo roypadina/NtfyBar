@@ -15,6 +15,8 @@ extension QuietHours {
         return s < e ? (t >= s && t < e) : (t >= s || t < e)
     }
 
+    public static func isValidTime(_ hhmm: String) -> Bool { minutes(hhmm) != nil }
+
     static func minutes(_ hhmm: String) -> Int? {
         let parts = hhmm.split(separator: ":")
         guard parts.count == 2, let h = Int(parts[0]), let m = Int(parts[1]), (0..<24).contains(h), (0..<60).contains(m) else { return nil }
