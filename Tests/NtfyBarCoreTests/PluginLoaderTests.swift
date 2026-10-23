@@ -269,3 +269,37 @@ final class MarketplaceTests {
         }
     }
 }
+
+/// Opt-in cross-check with a NtfyBar-Plugins checkout: `NTFYBAR_PLUGINS_REPO=<path> swift test --filter MarketplaceRepo`.
+/// Every entry must pass the app's real installer checks, and its plugin must load.
+@Suite("Marketplace repo", .enabled(if: ProcessInfo.processInfo.environment["NTFYBAR_PLUGINS_REPO"] != nil))
+@MainActor
+struct MarketplaceRepoTests {
+    @Test func everyEntryInstallsAndLoads() async throws {
+        let repo = URL(fileURLWithPath: ProcessInfo.processInfo.environment["NTFYBAR_PLUGINS_REPO"]!)
+        let index = try JSONDecoder().decode(MarketplaceIndex.self, from: Data(contentsOf: repo.appendingPathComponent("marketplace.json")))
+        #expect(!index.plugins.isEmpty)
+        let host = uniqueHost()
+        StubProtocol.register(host) { req, _ in
+            // https://<host>/roypadina/NtfyBar-Plugins/main/<path>/<file> → <repo>/<path>/<file>
+            let parts = req.url!.path.split(separator: "/").dropFirst(3).joined(separator: "/")
+            guard let data = try? Data(contentsOf: repo.appendingPathComponent(parts)) else { return [.status(404), .end] }
+            return [.status(200), .data(data), .end]
+        }
+        let dir = tempDir()
+        for entry in index.plugins {
+            let prepared = try await Marketplace.prepare(entry, marketplaceURL: PluginSettings.officialMarketplace,
+                                                         session: StubProtocol.session(), appVersion: "1.0.0", rawBase: "https://\(host)")
+            try Marketplace.commit(prepared, into: dir)
+        }
+        let fake = FakeHost()
+        for entry in index.plugins {
+            fake.config.plugins.grants[entry.id] = PluginGrant(permissions: entry.permissions, source: "installed")
+            fake.config.plugins.installedFrom[entry.id] = PluginSettings.officialMarketplace
+        }
+        let m = PluginManager(bundledDirectory: nil, installedDirectory: dir, appVersion: "1.0.0", registry: ProviderRegistry(), host: fake)
+        m.reload(config: fake.config)
+        #expect(m.packages.count == index.plugins.count)
+        #expect(m.packages.allSatisfy { $0.state == .active && $0.errors.isEmpty && $0.verified }, "\(m.packages.map { ($0.id, $0.errors) })")
+    }
+}
