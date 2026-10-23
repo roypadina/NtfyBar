@@ -127,9 +127,19 @@ adds conditions and actions from plugins; see [Plugins](#plugins).
 ## Plugins
 
 Plugins are small JavaScript packages from the [NtfyBar-Plugins](https://github.com/roypadina/NtfyBar-Plugins)
-marketplace, another marketplace you add, or a local folder. Two ship with NtfyBar (off until you
-enable them): **ACK Button** (a popup that replies "ACK" to the sender's topic) and **JSON Fields**
-(match and display JSON messages).
+marketplace, another marketplace you add, or a local folder. These ship with NtfyBar (off until you
+enable them in Settings › Plugins, then use them in a rule):
+
+| Plugin | What it adds |
+|---|---|
+| **Alert Card** | A big card with **Acknowledge** and **Snooze N min** (the alert comes back later, even if NtfyBar was quit), optional auto-dismiss, position and "over full-screen apps" of your choice, and a "3rd time today" badge. |
+| **Repeat & Burst** | Conditions "not seen recently" (calm a flapping alert: only the first of a series) and "burst" (≥ N messages in M minutes). |
+| **Extract** | Copy the part of a message a regex matches (a login code, an IP), or open it in a link template (a PR number → its page). |
+| **JSON Fields** | Match JSON messages by a field's value or by a change since the previous message; show a JSON message as a table. |
+| **ACK Button** | A popup whose ACK button replies to the sender's topic. |
+
+More in the marketplace, e.g. **Time Window** (only between 09:00–18:00 on weekdays) and **Reply
+Buttons** (up to three buttons that each send a reply — two-way home automation).
 
 A plugin sees only the message that triggered it — never your settings; topic names and server
 addresses are hidden from it (best-effort, see Privacy) — and can only do what its permissions allow, after you agreed. Each permission can be

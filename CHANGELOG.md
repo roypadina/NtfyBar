@@ -6,6 +6,18 @@ uses [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [1.1.0] - 2026-10-23
+
+### Added
+- Bundled plugin **Alert Card**: a big alert card with Acknowledge and Snooze (re-sent by the ntfy server after N minutes), optional auto-dismiss, position and level choice, and a times-today badge.
+- Bundled plugin **Repeat & Burst**: "not seen recently" and "burst" conditions over a topic's recent history.
+- Bundled plugin **Extract**: copy a regex match, or open it in a link template.
+- JSON Fields 1.1.0: "JSON field changed" condition.
+- Plugin API: popups can choose `position` and `level`; plugins can declare `choice` parameters; `ntfy.publish` takes `delay` (scheduled messages, 10 s – 3 days).
+
+### Changed
+- Scheduled publishes count quiet hours at the time they will arrive, and skip the loop guard (they are meant to come back and run rules).
+
 ## [1.0.1] - 2026-10-23
 
 ### Added
