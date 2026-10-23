@@ -16,7 +16,7 @@ enum Entry {
             switch flag {
             case "--render-settings", "--render-popup", "--render-history":
                 guard let path else { fail("missing output path for \(flag)") }
-                exit(Renderer.run(flag, to: URL(fileURLWithPath: path)) ? 0 : 1)
+                exit(MainActor.assumeIsolated { Renderer.run(flag, to: URL(fileURLWithPath: path)) } ? 0 : 1)
             case "--help":
                 print(usage)
                 exit(0)
