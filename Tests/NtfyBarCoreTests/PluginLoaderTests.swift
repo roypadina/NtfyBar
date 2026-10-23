@@ -66,13 +66,13 @@ struct PluginLoaderTests {
 
     @Test func grantsAreBoundToTheirSource() throws {
         let local = tempDir()
-        _ = try writePackage(local, id: "com.ntfybar.ack-button", permissions: ["publish"])
+        _ = try writePackage(local, id: "com.example.shared", permissions: ["publish"])
         host.config.plugins.localFolders = [local.path]
-        host.config.plugins.grants["com.ntfybar.ack-button"] = PluginGrant(permissions: ["publish"], source: "bundled")
+        host.config.plugins.grants["com.example.shared"] = PluginGrant(permissions: ["publish"], source: "bundled")
         let m = manager()
         m.reload(config: host.config)
-        #expect(m.package("com.ntfybar.ack-button")?.state == .needsConsent, "a local copy doesn't inherit the bundled grant")
-        #expect(m.package("com.ntfybar.ack-button")?.verified == false)
+        #expect(m.package("com.example.shared")?.state == .needsConsent, "a local copy doesn't inherit a bundled grant")
+        #expect(m.package("com.example.shared")?.verified == false)
     }
 
     @Test func duplicateIdIsRefused() throws {

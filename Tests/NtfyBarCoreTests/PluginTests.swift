@@ -328,3 +328,157 @@ struct ManifestTests {
         #expect(!m.providerErrors(p).isEmpty)
     }
 }
+
+@Suite("Plugin hardening")
+@MainActor
+struct PluginHardeningTests {
+    let host = FakeHost()
+    let id = "com.example.hard"
+
+    func runtime(_ script: String, _ granted: Set<Permission>, timeLimit: Double = 1) throws -> PluginRuntime {
+        host.grants[id] = granted
+        return try PluginRuntime(pluginId: id, script: script, granted: granted, host: host, timeLimit: timeLimit)
+    }
+
+    @Test func savedReferencesStillHonourRevocation() throws {
+        let r = try runtime("""
+            var p, s;
+            function keep(ctx) { p = ntfy.publish; s = ntfy.storage.set; return true; }
+            function useP(ctx) { return p({topicId: ctx.topic.id, message: 'x'}); }
+            function useCall(ctx) { return p.call(ntfy, {topicId: ctx.topic.id, message: 'x'}); }
+            function useS(ctx) { return s('k', 1); }
+            """, [.publish, .storage])
+        #expect(try r.condition("keep", ctx: host.ctx(), params: [:]))
+        host.grants[id] = []
+        for fn in ["useP", "useCall", "useS"] {
+            #expect(throws: PluginError.self) { try r.condition(fn, ctx: host.ctx(), params: [:]) }
+        }
+        #expect(host.published.isEmpty)
+    }
+
+    @Test func hostileArgumentsAreSnapshottedOnce() throws {
+        let r = try runtime("""
+            function proxyThrows(ctx) { return ntfy.publish(new Proxy({}, {get: function() { throw new Error('gotcha'); }})); }
+            function flipping(ctx) {
+              var n = 0, real = ctx.topic.id;
+              var o = {}; Object.defineProperty(o, 'topicId', {enumerable: true, get: function() { n++; return n === 1 ? real : '00000000-0000-0000-0000-000000000000'; }});
+              o.message = 'x';
+              return ntfy.publish(o);
+            }
+            function swapped(ctx) { return ntfy.publish({toJSON: function() { return {topicId: 'nope', message: 'x'}; }}); }
+            function circular(ctx) { var o = {message: 'x'}; o.self = o; return ntfy.publish(o); }
+            function circularStore(ctx) { var o = {}; o.self = o; return ntfy.storage.set('k', o); }
+            """, [.publish, .storage])
+        // A getter that changes its answer is read once (by JSON.stringify): the first, valid value is what gets
+        // published — never a value that wasn't checked.
+        _ = try? r.condition("flipping", ctx: host.ctx(), params: [:])
+        #expect(host.published.allSatisfy { $0.1.topicId == host.triggerTopic.id })
+        let before = host.published.count
+        for fn in ["proxyThrows", "swapped", "circular", "circularStore"] {
+            #expect(throws: PluginError.self) { try r.condition(fn, ctx: host.ctx(), params: [:]) }
+        }
+        #expect(host.published.count == before)
+    }
+
+    @Test func pluginPopupWithoutDefaultMakesDismissTheDefault() throws {
+        let spec = try PopupSpec.parse(JSONValue.parse(#"{"title":"Delete?","buttons":[{"id":"del","label":"Delete","style":"destructive"}]}"#)!)
+        let c = spec.content(key: "k", label: "L", pluginName: "P", topicId: nil, messageId: nil)
+        #expect(c.buttons.filter { $0.style == .prominent }.map(\.id) == ["dismiss"])
+    }
+
+    @Test func cumulativeTimeBudget() throws {
+        let r = try runtime("function busy(ctx) { var t = Date.now(); while (Date.now() - t < 120) {} return true; }", [], timeLimit: 0.2)
+        var calls = 0
+        while !r.isDisabled && calls < 20 {
+            _ = try? r.condition("busy", ctx: host.ctx(), params: [:])
+            calls += 1
+        }
+        #expect(r.isDisabled, "5 × 0.2 s budget per minute exceeded")
+        #expect(calls <= 10)
+    }
+
+    @Test func openURLIsRateLimited() throws {
+        let r = try runtime("function go(ctx) { return ntfy.openURL('https://example.com/x'); }", [.openURL])
+        for _ in 0..<10 { #expect(try r.condition("go", ctx: host.ctx(), params: [:])) }
+        #expect(throws: PluginError.self) { try r.condition("go", ctx: host.ctx(), params: [:]) }
+        #expect(host.opened.count == 10)
+    }
+
+    @Test func hugeResultIsAnErrorNotACrash() throws {
+        let r = try runtime("function big(ctx) { var s = 'x'; for (var i = 0; i < 24; i++) s = s + s; return {popup: {title: s}}; }", [.ui])
+        #expect(throws: (any Error).self) { try r.action("big", ctx: host.ctx(), params: [:]) }
+    }
+
+    @Test func reservedNamesNeedAVerifiedSource() throws {
+        let local = tempDir()
+        _ = try writePackage(local, id: "com.ntfybar.lookalike")
+        let folder = try writePackage(local, id: "com.example.impostor")
+        var m = try JSONSerialization.jsonObject(with: Data(contentsOf: folder.appendingPathComponent("plugin.json"))) as! [String: Any]
+        m["author"] = ["name": "NtfyBar Team"]
+        try JSONSerialization.data(withJSONObject: m).write(to: folder.appendingPathComponent("plugin.json"))
+        host.config.plugins.localFolders = [local.path]
+        let manager = PluginManager(bundledDirectory: nil, installedDirectory: tempDir(), appVersion: "1.0.0", registry: ProviderRegistry(), host: host)
+        manager.reload(config: host.config)
+        #expect(manager.packages.count == 2 && manager.packages.allSatisfy { $0.state == .invalid })
+    }
+}
+
+@Suite("Plugin install policy")
+@MainActor
+final class InstallPolicyTests {
+    let host = uniqueHost()
+
+    func engine() throws -> Engine {
+        try Engine(store: ConfigStore(directory: tempDir()), session: StubProtocol.session(), bundledPlugins: bundledPluginsDir)
+    }
+
+    func prepared(id: String, from marketplace: String) async throws -> PreparedInstall {
+        let src = try writePackage(tempDir(), id: id, permissions: ["ui"])
+        let files = ["plugin.json": try Data(contentsOf: src.appendingPathComponent("plugin.json")),
+                     "main.js": try Data(contentsOf: src.appendingPathComponent("main.js"))]
+        StubProtocol.register(host) { req, _ in
+            guard let data = files[req.url!.lastPathComponent] else { return [.status(404), .end] }
+            return [.status(200), .data(data), .end]
+        }
+        let entry = MarketplaceEntry(id: id, name: "T", description: "d", version: "1.0.0", permissions: ["ui"],
+                                     source: .init(type: "github", repo: "someone/p", ref: "main", path: ""),
+                                     files: files.mapValues(Marketplace.sha256Hex))
+        return try await Marketplace.prepare(entry, marketplaceURL: marketplace, session: StubProtocol.session(),
+                                             appVersion: "1.0.0", rawBase: "https://\(host)")
+    }
+
+    @Test func anotherMarketplaceCannotTakeOverAnInstalledOrBundledId() async throws {
+        let e = try engine()
+        #expect(e.installConflict(id: "com.ntfybar.ack-button", marketplaceURL: PluginSettings.officialMarketplace) != nil, "bundled")
+        #expect(e.installConflict(id: "com.ntfybar.other", marketplaceURL: "https://evil.example/m.json") != nil, "reserved id space")
+        try e.install(try await prepared(id: "com.example.mine", from: "https://one.example/m.json"))
+        #expect(e.pluginPackages.first { $0.id == "com.example.mine" }?.state == .active)
+        #expect(e.installConflict(id: "com.example.mine", marketplaceURL: "https://one.example/m.json") == nil, "update from the same marketplace")
+        let rival = try await prepared(id: "com.example.mine", from: "https://two.example/m.json")
+        #expect(throws: MarketplaceError.self) { try e.install(rival) }
+    }
+
+    @Test func declinedConsentWritesNothing() async throws {
+        let e = try engine()
+        _ = try await prepared(id: "com.example.declined", from: "https://one.example/m.json")
+        // The user cancels the consent sheet: prepare() alone never touched the disk.
+        let dir = e.store.pluginsDirectory
+        let items = (try? FileManager.default.contentsOfDirectory(atPath: dir.path)) ?? []
+        #expect(items.isEmpty)
+    }
+
+    @Test func pausedPluginLinksAndPopupsAreSuppressed() throws {
+        let e = try engine()
+        var opened: [URL] = []
+        e.onOpen = { opened.append($0) }
+        try e.update { $0.pausedUntil = .distantFuture }
+        e.open(URL(string: "https://example.com")!)
+        #expect(opened.isEmpty)
+        try e.update { $0.pausedUntil = nil }
+        e.open(URL(string: "https://example.com")!)
+        #expect(opened.count == 1)
+        let spec = try PopupSpec.parse(JSONValue.parse(#"{"title":"x"}"#)!)
+        let effect = Effect.pluginPopup(PluginPopupRequest(pluginId: "p", pluginName: "P", spec: spec, topicId: UUID(), messageId: "m", label: "L"))
+        #expect(effect.interrupts)
+    }
+}

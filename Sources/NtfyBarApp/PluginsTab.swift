@@ -149,13 +149,20 @@ struct PluginsTab: View {
                             Text(item.entry.description).foregroundStyle(.secondary)
                             Text(item.entry.permissions.isEmpty ? "No extra permissions" : "Asks for: " + item.entry.permissions.joined(separator: ", "))
                                 .font(.caption).foregroundStyle(.secondary)
+                            Text("From " + (item.source == PluginSettings.officialMarketplace ? "the official marketplace"
+                                                                                               : URL(string: item.source)?.host() ?? item.source))
+                                .font(.caption).foregroundStyle(.secondary)
                             if item.source != PluginSettings.officialMarketplace {
                                 Label("Unverified source", systemImage: "exclamationmark.shield").font(.caption).foregroundStyle(.orange)
                             }
                         }
                         Spacer()
-                        Button(installLabel(item.entry)) { install(item.entry, from: item.source) }
-                            .disabled(busy || installLabel(item.entry) == "Installed")
+                        if let conflict = engine.installConflict(id: item.entry.id, marketplaceURL: item.source) {
+                            Text(conflict).font(.caption).foregroundStyle(.secondary).multilineTextAlignment(.trailing).frame(maxWidth: 200)
+                        } else {
+                            Button(installLabel(item.entry)) { install(item.entry, from: item.source) }
+                                .disabled(busy || installLabel(item.entry) == "Installed")
+                        }
                     }
                 }
             }
@@ -165,7 +172,7 @@ struct PluginsTab: View {
 
     private func installLabel(_ e: MarketplaceEntry) -> String {
         guard let pkg = engine.pluginPackages.first(where: { $0.id == e.id && $0.source == .installed }), let m = pkg.manifest else {
-            return engine.pluginPackages.contains { $0.id == e.id } ? "Install" : "Install…"
+            return "Install…"
         }
         return PluginManifest.compareVersions(e.version, m.version) == .orderedDescending ? "Update…" : "Installed"
     }

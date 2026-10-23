@@ -69,6 +69,10 @@ public final class PluginRuntime {
     private let timeLimit: Double
     private var lastException: String?
     private var trigger: ProviderContext?
+    /// JS time spent per call in the last minute: over 5 s in total disables the plugin, so many
+    /// "just under 1 s" calls can't hog the main thread either.
+    private var cpuLog: [(at: Date, seconds: Double)] = []
+    private var urlLimiter = RateLimiter(limit: 10, window: 60)
     private lazy var storage = PluginStorage(directory: host?.pluginDataDirectory ?? URL(fileURLWithPath: "/dev/null"), pluginId: pluginId)
 
     public init(pluginId: String, script: String, granted: Set<Permission>, host: PluginHost, timeLimit: Double = 1) throws {
@@ -143,6 +147,12 @@ public final class PluginRuntime {
         lastException = nil
         let start = Date()
         let result = fn.call(withArguments: [fromJSON(ctxJSON)] + args.map { fromJSON($0) })
+        let spent = Date().timeIntervalSince(start)
+        cpuLog = cpuLog.filter { start.timeIntervalSince($0.at) < 60 } + [(start, spent)]
+        if cpuLog.reduce(0, { $0 + $1.seconds }) > 5 * timeLimit {
+            strikes = 3
+            Log.plugins.error("\(self.pluginId, privacy: .public) used more than \(Int(5 * self.timeLimit), privacy: .public) s of JavaScript time in a minute; disabled until reload")
+        }
         if let error = lastException {
             lastException = nil
             if Date().timeIntervalSince(start) >= timeLimit * 0.9 || error.localizedCaseInsensitiveContains("terminated") {
@@ -290,6 +300,10 @@ public final class PluginRuntime {
         guard allowed(.openURL), let host else { return nil }
         guard let arg, arg.isString, let url = SafeOpen.url(arg.toString()) else {
             fail("openURL only opens http(s) URLs")
+            return nil
+        }
+        guard urlLimiter.allow("open", at: Date()) else {
+            fail("openURL is limited to 10 links a minute")
             return nil
         }
         host.open(url)

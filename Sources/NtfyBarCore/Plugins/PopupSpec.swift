@@ -88,11 +88,12 @@ public struct PopupSpec: Equatable, Sendable {
         return PopupSpec(title: title, icon: icon, accent: accent, timeoutSec: timeout, blocks: blocks, buttons: buttons, state: state)
     }
 
-    /// The native popup for this spec. Plugin buttons report back to the plugin; Dismiss is always there.
+    /// The native popup for this spec. Plugin buttons report back to the plugin; Dismiss is always
+    /// there and is the Return button unless the plugin marked one of its own as prominent.
     public func content(key: String, label: String, pluginName: String, topicId: UUID?, messageId: String?) -> PopupContent {
         var buttons = self.buttons.map { PopupContent.Button(id: $0.id, label: $0.label, style: $0.style, action: .plugin($0.id)) }
-        if !buttons.contains(where: { $0.style == .prominent }), !buttons.isEmpty { buttons[0].style = .prominent }
-        buttons.append(PopupContent.Button(id: "dismiss", label: "Dismiss", style: buttons.isEmpty ? .prominent : .default, action: .dismiss))
+        let hasDefault = buttons.contains { $0.style == .prominent }
+        buttons.append(PopupContent.Button(id: "dismiss", label: "Dismiss", style: hasDefault ? .default : .prominent, action: .dismiss))
         return PopupContent(key: key, header: "\(label) · \(pluginName)", date: Date(), priority: nil, icon: icon, accent: accent,
                             title: title, blocks: blocks, tags: [], attachment: nil, buttons: buttons, timeoutSec: timeoutSec ?? 0,
                             level: .floating, position: .topCenter, topicId: topicId, messageId: messageId, copyText: nil)

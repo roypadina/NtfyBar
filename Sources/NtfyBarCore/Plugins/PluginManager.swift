@@ -165,6 +165,12 @@ public final class PluginManager {
         if source == .installed {
             pkg.verified = config.plugins.installedFrom[manifest.id] == PluginSettings.officialMarketplace
         }
+        // NtfyBar's own name and id space only from verified sources (no look-alike plugins).
+        if !pkg.verified, manifest.id.hasPrefix("com.ntfybar.") || (manifest.author?.name ?? "").localizedCaseInsensitiveContains("ntfybar")
+            || manifest.name.localizedCaseInsensitiveContains("ntfybar") {
+            pkg.errors = ["the NtfyBar name and com.ntfybar.* ids are reserved for official plugins"]
+            return pkg
+        }
         if config.plugins.disabledIds.contains(manifest.id) {
             pkg.state = .disabled
         } else if Self.needsConsent(manifest, source: source, config: config) {

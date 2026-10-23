@@ -199,8 +199,32 @@ public final class Engine {
         reloadPlugins()
     }
 
+    /// Why a marketplace entry may not be installed here, or nil. An id that is bundled, loaded from
+    /// a local folder, or installed from a different marketplace can't be replaced from this one —
+    /// otherwise any added marketplace could take over a trusted plugin with an "update".
+    public func installConflict(id: String, marketplaceURL: String) -> String? {
+        for pkg in pluginPackages where pkg.id == id && pkg.manifest != nil {
+            switch pkg.source {
+            case .bundled: return "Bundled with NtfyBar"
+            case .local: return "Conflicts with a plugin in a local folder"
+            case .installed:
+                let from = config.plugins.installedFrom[id] ?? ""
+                if from != marketplaceURL {
+                    return "Conflicts with the installed copy from " + (URL(string: from)?.host() ?? "another marketplace")
+                }
+            }
+        }
+        if id.hasPrefix("com.ntfybar."), marketplaceURL != PluginSettings.officialMarketplace {
+            return "com.ntfybar.* plugins come only from the official marketplace"
+        }
+        return nil
+    }
+
     /// Writes a verified marketplace package and records the user's consent in one go.
     public func install(_ prepared: PreparedInstall) throws {
+        if let conflict = installConflict(id: prepared.manifest.id, marketplaceURL: prepared.marketplaceURL) {
+            throw MarketplaceError.invalidEntry(conflict)
+        }
         try Marketplace.commit(prepared, into: store.pluginsDirectory)
         let m = prepared.manifest
         try update { c in
@@ -440,5 +464,9 @@ extension Engine: PluginHost {
     }
 
     public func copy(_ text: String) { onCopy?(text) }
-    public func open(_ url: URL) { if SafeOpen.isAllowed(url) { onOpen?(url) } }
+    /// Paused = no browser windows popping up, same as the openURL rule action.
+    public func open(_ url: URL) {
+        guard SafeOpen.isAllowed(url), !config.isPaused(at: now()) else { return }
+        onOpen?(url)
+    }
 }

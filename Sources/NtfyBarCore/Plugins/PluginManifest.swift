@@ -23,7 +23,7 @@ public enum Permission: String, Codable, CaseIterable, Sendable, Comparable {
         case .topicsRead: "See the labels of all your topics (and, with history access, their messages)."
         case .publish: "Send messages to your topics — at most 10 a minute, capped by quiet hours."
         case .clipboardWrite: "Put text on your clipboard."
-        case .openURL: "Open web links (http/https) in your browser."
+        case .openURL: "Open web links (http/https) in your browser — a link can carry message text to that site."
         case .storage: "Keep up to 1 MB of its own data on this Mac."
         case .ui: "Show its own popups with buttons."
         }
