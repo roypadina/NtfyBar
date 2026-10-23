@@ -58,12 +58,14 @@ public final class Dispatcher {
         var effects = outcome.skipTopicDefaults ? [] : topicDefaults(m, topic: topic)
         effects += outcome.effects
 
-        // Flood guard applies to live popups only (catch-up never pops up anyway).
-        if effects.contains(where: Self.isPopup), let collapsed = flood.record(m.topicId, at: now) {
-            effects.removeAll(where: Self.isPopup)
-            // One sound when the burst starts, then silence until it ends.
-            if collapsed > 1 { effects.removeAll(where: Self.isSound) }
-            effects.append(.summaryPopup(topicId: m.topicId, label: topic.displayLabel, count: collapsed))
+        // Flood guard (live or processMissed messages only — plain catch-up returned above): during a
+        // burst, banners, popups and sounds collapse into one notice + one counting popup.
+        if effects.contains(where: Self.isAlert), let collapsed = flood.record(m.topicId, at: now) {
+            let hadPopup = effects.contains(where: Self.isPopup)
+            let hadNotify = effects.contains { if case .notify = $0 { true } else { false } }
+            effects.removeAll { Self.isAlert($0) || Self.isSound($0) }
+            if collapsed == 1, hadNotify { effects.append(.floodNotification(topicId: m.topicId, label: topic.displayLabel)) }
+            if hadPopup { effects.append(.summaryPopup(topicId: m.topicId, label: topic.displayLabel, count: collapsed)) }
         }
         return config.isPaused(at: now) ? effects.filter { !$0.interrupts } : effects
     }
@@ -101,6 +103,13 @@ public final class Dispatcher {
     private static func isPopup(_ e: Effect) -> Bool {
         if case .popup = e { return true }
         return false
+    }
+
+    private static func isAlert(_ e: Effect) -> Bool {
+        switch e {
+        case .popup, .notify: true
+        default: false
+        }
     }
 
     private static func isSound(_ e: Effect) -> Bool {

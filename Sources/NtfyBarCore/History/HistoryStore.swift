@@ -1,6 +1,10 @@
 import Foundation
 import SQLite3
 
+public enum InsertResult: Equatable, Sendable {
+    case inserted, duplicate, failed
+}
+
 public enum HistoryError: Error, Equatable {
     case open(String)
     case sql(String)
@@ -39,9 +43,9 @@ public final class HistoryStore {
 
     // MARK: writes
 
-    /// false when (topicId, id) is already stored.
+    /// `.duplicate` when (topicId, id) is already stored; `.failed` on a database error.
     @discardableResult
-    public func insert(_ m: Message) -> Bool {
+    public func insert(_ m: Message) -> InsertResult {
         let sql = """
             INSERT OR IGNORE INTO messages (topic_id, id, time, received_at, priority, title, message, json, catch_up, read)
             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
@@ -49,7 +53,14 @@ public final class HistoryStore {
         let ok = run(sql, [.text(m.topicId.uuidString), .text(m.ntfy.id), .int(m.ntfy.time),
                            .real(m.receivedAt.timeIntervalSince1970), .int(Int64(m.priority)), .textOrNull(m.title),
                            .text(m.body), .text(m.raw), .int(m.isCatchUp ? 1 : 0), .int(m.read ? 1 : 0)])
-        return ok && sqlite3_changes(db) == 1
+        guard ok else { return .failed }
+        return sqlite3_changes(db) == 1 ? .inserted : .duplicate
+    }
+
+    /// Closes the database; every later call fails cleanly (tests use this to simulate a broken store).
+    public func close() {
+        sqlite3_close(db)
+        db = nil
     }
 
     /// topicId nil = every topic; id nil = every message of the topic(s).

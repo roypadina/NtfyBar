@@ -9,6 +9,8 @@ public enum StatusSummary {
             base = config.topics.isEmpty ? "No topics yet — add one in Settings" : "No active topics"
         } else if states.values.contains(where: { if case .authFailed = $0 { true } else { false } }) {
             base = "Sign-in failed — check Settings › Servers"
+        } else if states.values.contains(where: { if case .redirected = $0 { true } else { false } }) {
+            base = "Server redirects — enter its final URL in Settings › Servers"
         } else if states.values.contains(where: { if case .reconnecting = $0 { true } else { false } }) {
             base = "Reconnecting…"
         } else if !states.isEmpty, states.values.allSatisfy({ $0 == .connected }) {

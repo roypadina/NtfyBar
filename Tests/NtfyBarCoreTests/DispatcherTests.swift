@@ -22,6 +22,7 @@ struct DispatcherTests {
             case .popup: "popup"
             case .summaryPopup: "summaryPopup"
             case .summaryNotification: "summaryNotification"
+            case .floodNotification: "floodNotification"
             case .copy: "copy"
             case .playSound: "sound"
             case .runCommand: "command"
@@ -74,23 +75,44 @@ struct DispatcherTests {
         #expect(d.flushCatchUp(config: c, now: now).isEmpty, "no summary while paused")
     }
 
-    @Test func floodCollapsesPopupsUntilBurstEnds() {
+    @Test func floodCollapsesBannersAndPopupsUntilBurstEnds() {
         let d = Dispatcher()
-        var popups = 0
+        var log: [[String]] = []
         var summaries: [Int] = []
         for i in 0..<8 {
             let effects = d.handle(makeMessage(topicId: topicId, id: "f\(i)"), config: config, now: now.addingTimeInterval(Double(i)))
-            for e in effects {
-                if case .popup = e { popups += 1 }
-                if case let .summaryPopup(_, _, n) = e { summaries.append(n) }
-            }
-            #expect(effects.contains { if case .notify = $0 { true } else { false } }, "notifications keep coming")
+            log.append(kinds(effects))
+            for e in effects { if case let .summaryPopup(_, _, n) = e { summaries.append(n) } }
         }
-        #expect(popups == 5)
+        #expect(log.prefix(5).allSatisfy { $0 == ["notify", "popup"] })
+        #expect(log[5] == ["floodNotification", "summaryPopup"], "one notice when the burst starts")
+        #expect(log[6] == ["summaryPopup"] && log[7] == ["summaryPopup"], "then silence, only the counter")
         #expect(summaries == [1, 2, 3])
         // 10 s of silence ends the burst.
         let after = d.handle(makeMessage(topicId: topicId, id: "late"), config: config, now: now.addingTimeInterval(7 + 10))
-        #expect(kinds(after).contains("popup"))
+        #expect(kinds(after) == ["notify", "popup"])
+    }
+
+    @Test func catchUpReplayDoesNotTripTheFloodGuard() {
+        let d = Dispatcher()
+        for i in 0..<20 { _ = d.handle(makeMessage(topicId: topicId, id: "c\(i)", isCatchUp: true), config: config, now: now) }
+        #expect(kinds(d.handle(makeMessage(topicId: topicId, id: "live"), config: config, now: now)) == ["notify", "popup"])
+    }
+
+    @Test func processMissedReplayIsFloodGuarded() {
+        var c = config
+        c.topics[0].processMissed = true
+        let d = Dispatcher()
+        var all: [String] = []
+        for i in 0..<20 { all += kinds(d.handle(makeMessage(topicId: topicId, id: "c\(i)", isCatchUp: true), config: c, now: now)) }
+        #expect(all.filter { $0 == "popup" }.count == 5)
+        #expect(all.filter { $0 == "floodNotification" }.count == 1)
+    }
+
+    @Test func expiredPauseRunsEverything() {
+        var c = config
+        c.pausedUntil = now.addingTimeInterval(-1)
+        #expect(kinds(Dispatcher().handle(makeMessage(topicId: topicId), config: c, now: now)) == ["notify", "popup"])
     }
 
     @Test func floodGuardWindowIsSliding() {

@@ -14,9 +14,9 @@ struct HistoryStoreTests {
     @Test func insertDedupesOnTopicAndId() throws {
         let h = try store()
         let m = makeMessage(topicId: a, id: "x1")
-        #expect(h.insert(m))
-        #expect(!h.insert(m), "same (topicId, id) again")
-        #expect(h.insert(makeMessage(topicId: b, id: "x1")), "same id on another topic is a different message")
+        #expect(h.insert(m) == .inserted)
+        #expect(h.insert(m) == .duplicate, "same (topicId, id) again")
+        #expect(h.insert(makeMessage(topicId: b, id: "x1")) == .inserted, "same id on another topic is a different message")
         #expect(h.count() == 2)
     }
 
@@ -101,6 +101,14 @@ struct HistoryStoreTests {
         #expect(h.count() == 0)
     }
 
+    @Test func closedStoreFailsCleanly() throws {
+        let h = try store()
+        h.close()
+        #expect(h.insert(makeMessage(topicId: a, id: "z")) == .failed)
+        #expect(h.recent(limit: 5).isEmpty)
+        #expect(h.unreadCount() == 0)
+    }
+
     @Test func persistsAcrossReopen() throws {
         do {
             let h = try store()
@@ -108,6 +116,6 @@ struct HistoryStoreTests {
         }
         let h2 = try store()
         #expect(h2.count() == 1)
-        #expect(!h2.insert(makeMessage(topicId: a, id: "p")))
+        #expect(h2.insert(makeMessage(topicId: a, id: "p")) == .duplicate)
     }
 }

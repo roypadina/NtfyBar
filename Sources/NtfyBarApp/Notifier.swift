@@ -44,15 +44,11 @@ final class Notifier: NSObject, UNUserNotificationCenterDelegate {
 
     func post(_ m: Message, label: String, silent: Bool) {
         guard isAvailable else { return }
+        let text = NotificationText.message(m, label: label)
         let content = UNMutableNotificationContent()
-        let emoji = Emoji.prefix(for: m.tags)
-        if let title = m.title, !title.isEmpty {
-            content.title = emoji + title
-            content.subtitle = label
-        } else {
-            content.title = emoji + label
-        }
-        content.body = m.body.count > 2000 ? String(m.body.prefix(2000)) + "…" : m.body
+        content.title = text.title
+        content.subtitle = text.subtitle
+        content.body = text.body
         content.categoryIdentifier = Self.messageCategory
         content.threadIdentifier = m.topicId.uuidString
         content.userInfo = ["topicId": m.topicId.uuidString, "id": m.ntfy.id]
@@ -61,21 +57,14 @@ final class Notifier: NSObject, UNUserNotificationCenterDelegate {
         add(UNNotificationRequest(identifier: m.id, content: content, trigger: nil))
     }
 
-    func postSummary(label: String, count: Int) {
+    /// App-level notices (catch-up summary, flood notice, failed command).
+    func post(_ text: NotificationText, category: String?) {
         guard isAvailable else { return }
         let content = UNMutableNotificationContent()
-        content.title = "\(count) message\(count == 1 ? "" : "s") while away · \(label)"
-        content.body = "Open NtfyBar's History to read them."
-        content.categoryIdentifier = Self.summaryCategory
-        add(UNNotificationRequest(identifier: UUID().uuidString, content: content, trigger: nil))
-    }
-
-    /// Plain notice from the app itself (e.g. a failed command).
-    func postNotice(title: String, body: String) {
-        guard isAvailable else { return }
-        let content = UNMutableNotificationContent()
-        content.title = title
-        content.body = body
+        content.title = text.title
+        content.subtitle = text.subtitle
+        content.body = text.body
+        if let category { content.categoryIdentifier = category }
         add(UNNotificationRequest(identifier: UUID().uuidString, content: content, trigger: nil))
     }
 

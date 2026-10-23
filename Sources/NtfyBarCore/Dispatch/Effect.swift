@@ -8,6 +8,8 @@ public enum Effect: Equatable, Sendable {
     /// Flood guard: one popup per topic that counts what was collapsed into it.
     case summaryPopup(topicId: UUID, label: String, count: Int)
     case summaryNotification(topicId: UUID, label: String, count: Int)
+    /// Flood guard: one banner when a burst starts; the rest wait in History.
+    case floodNotification(topicId: UUID, label: String)
     case copy(String)
     case playSound(String)
     case runCommand(CommandSettings, Message, label: String)
@@ -18,7 +20,7 @@ public enum Effect: Equatable, Sendable {
     /// Pause suppresses everything that interrupts; storing, copying and publishing go on.
     var interrupts: Bool {
         switch self {
-        case .notify, .popup, .summaryPopup, .summaryNotification, .playSound, .runCommand, .runShortcut, .openURL: true
+        case .notify, .popup, .summaryPopup, .summaryNotification, .floodNotification, .playSound, .runCommand, .runShortcut, .openURL: true
         case .copy, .publish: false
         }
     }

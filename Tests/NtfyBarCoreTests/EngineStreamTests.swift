@@ -95,6 +95,7 @@ final class EngineStreamTests {
             self.effects.contains(.summaryNotification(topicId: self.topicId, label: "Demo", count: 1))
         })
         #expect(e.recent.contains { $0.ntfy.id == "m2" && $0.isCatchUp })
+        e.saveState()  // state.json writes are debounced
         #expect(e.store.loadState().lastEventTime.values.first == t0 + 100)
     }
 
@@ -148,15 +149,128 @@ final class EngineStreamTests {
         #expect(e.unreadCount == 1)
     }
 
-    @Test func redirectIsNotFollowed() async throws {
+    @Test func redirectIsTerminalAndNotFollowed() async throws {
         let other = uniqueHost()
         StubProtocol.register(host) { _, _ in [.status(302, ["Location": "https://\(other)/x/json"]), .end] }
         StubProtocol.register(other) { _, _ in [.status(200)] }
         let e = try engine(auth: .token("tk_secret"))
         e.start()
         defer { e.stop() }
-        #expect(await eventually { StubProtocol.requests(self.host).count >= 2 }, "treated as a failure and retried")
+        #expect(await eventually { e.streamStates.values.first == .redirected(status: 302) })
+        try await Task.sleep(for: .milliseconds(300))
+        e.reconnectAll()
+        try await Task.sleep(for: .milliseconds(200))
+        #expect(StubProtocol.requests(host).count == 1, "no retry until the URL is fixed")
         #expect(StubProtocol.requests(other).isEmpty, "credentials never sent to the redirect target")
+        #expect(StatusSummary.line(config: e.config, states: e.streamStates, now: Date()).contains("redirects"))
+    }
+
+    @Test func backoffResetsAfterEachOpenEvent() async throws {
+        StubProtocol.register(host) { [topic] _, _ in [.status(200), .line(openLine(time: 1, topic: topic)), .end] }
+        let store = ConfigStore(directory: tempDir())
+        var c = Config()
+        c.servers = [ServerConfig(url: "https://\(host)")]
+        c.topics = [TopicConfig(id: topicId, serverId: c.servers[0].id, topic: topic, label: "Demo")]
+        try store.saveConfig(c)
+        let e = try Engine(store: store, session: StubProtocol.session(),
+                           timing: .init(keepaliveTimeout: 90, watchdogInterval: 0.05, backoff: Backoff(base: 0.3, cap: 10)))
+        e.start()
+        defer { e.stop() }
+        // With a reset after every `open`: gaps of ~0.3 s. Without: 0.3, 0.6, 1.2 … → 4th request after 2.1 s.
+        #expect(await eventually(timeout: 1.6) { StubProtocol.requests(self.host).count >= 4 })
+    }
+
+    @Test func steadyMessagesKeepTheWatchdogQuiet() async throws {
+        StubProtocol.register(host) { [topic, t0] _, attempt in
+            guard attempt == 0 else { return [.status(200)] }
+            var steps: [StubProtocol.Step] = [.status(200), .line(openLine(time: t0, topic: topic))]
+            for i in 0..<10 { steps += [.delay(0.1), .line(ntfyLine(id: "s\(i)", time: t0, topic: topic))] }
+            return steps
+        }
+        let e = try engine(keepalive: 0.3)
+        e.start()
+        defer { e.stop() }
+        #expect(await eventually(timeout: 3) { e.history.count() == 10 })
+        #expect(StubProtocol.requests(host).count == 1, "messages count as activity, not only keepalives")
+    }
+
+    @Test func failedInsertDoesNotAdvanceTheCursor() async throws {
+        StubProtocol.register(host) { [topic, t0] _, _ in
+            [.status(200), .line(openLine(time: t0, topic: topic)), .delay(0.4), .line(ntfyLine(id: "lost", time: t0, topic: topic))]
+        }
+        let e = try engine()
+        e.start()
+        #expect(await eventually { e.streamStates.values.first == .connected })
+        e.history.close()
+        try await Task.sleep(for: .milliseconds(600))
+        e.stop()
+        #expect(notified.isEmpty)
+        #expect(e.store.loadState().lastEventTime.isEmpty, "the next since= will fetch it again")
+    }
+
+    @Test func addingATopicReconnectsWithSince() async throws {
+        StubProtocol.register(host) { [topic, t0] _, attempt in
+            attempt == 0 ? [.status(200), .line(openLine(time: t0, topic: topic)), .line(ntfyLine(id: "a1", time: t0, topic: topic))]
+                         : [.status(200), .line(openLine(time: t0 + 5, topic: topic))]
+        }
+        let e = try engine()
+        e.start()
+        defer { e.stop() }
+        #expect(await eventually { self.notified == ["a1"] })
+        try e.update { c in c.topics.append(TopicConfig(serverId: c.servers[0].id, topic: "ntfybar-second-demo", label: "Second")) }
+        #expect(await eventually { StubProtocol.requests(self.host).count == 2 })
+        let second = StubProtocol.requests(host)[1]
+        #expect(second.url?.query == "since=\(t0)")
+        #expect(second.url?.path.contains("ntfybar-second-demo") == true)
+    }
+
+    @Test func reconnectNowCutsABackoffSleepShort() async throws {
+        StubProtocol.register(host) { [topic] _, _ in [.status(200), .line(openLine(time: 1, topic: topic)), .end] }
+        let store = ConfigStore(directory: tempDir())
+        var c = Config()
+        c.servers = [ServerConfig(url: "https://\(host)")]
+        c.topics = [TopicConfig(id: topicId, serverId: c.servers[0].id, topic: topic, label: "Demo")]
+        try store.saveConfig(c)
+        let e = try Engine(store: store, session: StubProtocol.session(),
+                           timing: .init(keepaliveTimeout: 90, watchdogInterval: 0.05, backoff: Backoff(base: 30, cap: 60)))
+        e.start()
+        defer { e.stop() }
+        #expect(await eventually { if case .reconnecting = e.streamStates.values.first { true } else { false } })
+        e.reconnectAll()
+        #expect(await eventually(timeout: 1) { StubProtocol.requests(self.host).count == 2 })
+    }
+
+    @Test func sameTopicNameOnTwoServersStaysSeparate() async throws {
+        let host2 = uniqueHost()
+        let otherId = UUID()
+        for h in [host, host2] {
+            StubProtocol.register(h) { [topic, t0] _, _ in
+                [.status(200), .line(openLine(time: t0, topic: topic)), .line(ntfyLine(id: "from-\(h)", time: t0, topic: topic))]
+            }
+        }
+        let e = try engine { [host2, topic, otherId] c in
+            let s2 = ServerConfig(url: "https://\(host2)")
+            c.servers.append(s2)
+            c.topics.append(TopicConfig(id: otherId, serverId: s2.id, topic: topic, label: "Other"))
+        }
+        e.start()
+        defer { e.stop() }
+        #expect(await eventually { e.history.count() == 2 })
+        #expect(e.history.recent(topicId: topicId, limit: 5).map(\.ntfy.id) == ["from-\(host)"])
+        #expect(e.history.recent(topicId: otherId, limit: 5).map(\.ntfy.id) == ["from-\(host2)"])
+    }
+
+    @Test func replacingATopicWithTheSameNameRebuildsTheStream() async throws {
+        StubProtocol.register(host) { [topic] _, _ in [.status(200), .line(openLine(time: 1, topic: topic))] }
+        let e = try engine()
+        e.start()
+        defer { e.stop() }
+        #expect(await eventually { e.streamStates.values.first == .connected })
+        try e.update { c in
+            let old = c.topics.removeFirst()
+            c.topics.append(TopicConfig(serverId: old.serverId, topic: old.topic, label: "New id"))
+        }
+        #expect(await eventually { StubProtocol.requests(self.host).count == 2 }, "new topicId → new stream")
     }
 
     @Test func messagesForUnconfiguredTopicsAreIgnored() async throws {

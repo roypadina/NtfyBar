@@ -19,7 +19,9 @@ final class EffectPerformer {
             case let .notify(m, label):
                 model.notifier.post(m, label: label, silent: ownSound)
             case let .summaryNotification(_, label, count):
-                model.notifier.postSummary(label: label, count: count)
+                model.notifier.post(NotificationText.catchUp(label: label, count: count), category: Notifier.summaryCategory)
+            case let .floodNotification(_, label):
+                model.notifier.post(NotificationText.flood(label: label), category: Notifier.summaryCategory)
             case let .popup(request):
                 showPopup(request, playSound: false)
             case let .summaryPopup(topicId, label, count):
@@ -30,9 +32,16 @@ final class EffectPerformer {
                 NSSound(named: NSSound.Name(name))?.play()
             case let .openURL(url):
                 open(url.absoluteString)
-            case .runCommand, .runShortcut, .publish:
-                // shortcut: M1 — commands, shortcuts and publishing arrive in M2a.
-                Log.app.info("effect not yet supported in this build")
+            case let .runCommand(settings, m, label):
+                model.engine.runCommand(settings, message: m) { [weak model] reason in
+                    model?.notifier.post(NotificationText(title: "Command failed · \(label)", subtitle: "", body: reason), category: nil)
+                }
+            case let .runShortcut(name, m):
+                model.engine.runShortcut(name: name, message: m) { [weak model] reason in
+                    model?.notifier.post(NotificationText(title: "Shortcut failed", subtitle: "", body: reason), category: nil)
+                }
+            case let .publish(request):
+                Task { try? await model.engine.publish(request, rateKey: "rules") }
             }
         }
     }
@@ -65,6 +74,7 @@ final class EffectPerformer {
         case let .popup(r): "popup \(r.message.ntfy.id)"
         case let .summaryPopup(_, _, n): "summaryPopup \(n)"
         case let .summaryNotification(_, _, n): "summaryNotification \(n)"
+        case .floodNotification: "floodNotification"
         case .copy: "copy"
         case let .playSound(s): "sound \(s)"
         case let .runCommand(_, m, _): "command \(m.ntfy.id)"
