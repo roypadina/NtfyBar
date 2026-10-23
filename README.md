@@ -130,8 +130,8 @@ marketplace, another marketplace you add, or a local folder. Two ship with NtfyB
 enable them): **ACK Button** (a popup that replies "ACK" to the sender's topic) and **JSON Fields**
 (match and display JSON messages).
 
-A plugin sees only the message that triggered it — never your topic names, server addresses or
-settings — and can only do what its permissions allow, after you agreed. Each permission can be
+A plugin sees only the message that triggered it — never your settings; topic names and server
+addresses are hidden from it (best-effort, see Privacy) — and can only do what its permissions allow, after you agreed. Each permission can be
 switched off later. Marketplace installs are checked file by file against published SHA-256
 checksums before anything is written. Plugins can **never** run commands, use the network, read
 your clipboard or files, change settings or subscribe to topics. Write your own:

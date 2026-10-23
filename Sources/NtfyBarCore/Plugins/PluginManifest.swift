@@ -30,7 +30,7 @@ public enum Permission: String, Codable, CaseIterable, Sendable, Comparable {
     }
 
     /// Always granted, always listed.
-    public static let implicitConsent = "Read each message that triggers it — title, text, tags, links — and that topic's label. Never topic names, server addresses or your settings."
+    public static let implicitConsent = "Read each message that triggers it — title, text, tags, links — and that topic's label. Never your settings; topic names and server addresses are hidden (best-effort)."
 }
 
 public struct PluginManifest: Codable, Equatable, Sendable {
