@@ -60,13 +60,72 @@ final class EffectPerformer {
     }
 
     func showPopup(_ request: PopupRequest, playSound: Bool) {
-        // shortcut: M1 — the native popup arrives in M2b; until then a notification stands in.
-        model.notifier.post(request.message, label: request.label, silent: !playSound)
+        let content = PopupContent.forMessage(request)
+        if playSound, let sound = request.settings.sound(forPriority: request.message.priority) {
+            NSSound(named: NSSound.Name(sound))?.play()
+        }
+        PopupPanel.show(content) { [weak self] button, state in self?.handle(button, in: state) }
     }
 
     func showSummaryPopup(topicId: UUID, label: String, count: Int) {
-        Log.app.info("flood summary popup (\(count, privacy: .public))")
+        PopupPanel.show(PopupContent.flood(topicId: topicId, label: label, count: count)) { [weak self] button, state in
+            self?.handle(button, in: state)
+        }
     }
+
+    /// One handler for every popup button. Opening, http actions and dismissing mark the message read.
+    func handle(_ button: PopupContent.Button, in state: PopupState) {
+        let content = state.content
+        let markRead = { [model] in
+            if let topicId = content.topicId, let id = content.messageId,
+               let m = model.engine.history.message(topicId: topicId, id: id) {
+                model.engine.markRead(m)
+            }
+        }
+        switch button.action {
+        case let .open(url):
+            open(url.absoluteString)
+            markRead()
+            PopupPanel.dismiss(state)
+        case let .copy(text):
+            copy(text)
+            flash(button.id, in: state)
+        case .dismiss:
+            markRead()
+            PopupPanel.dismiss(state)
+        case .showHistory:
+            HistoryWindow.show(model: model)
+            PopupPanel.dismiss(state)
+        case let .http(action):
+            Task { @MainActor in
+                let ok = await HTTPAction.perform(action, session: Self.actionSession)
+                if ok {
+                    markRead()
+                    if button.clears { PopupPanel.dismiss(state) } else { flash(button.id, in: state) }
+                } else {
+                    state.failed = button.id
+                }
+            }
+        case let .plugin(buttonId):
+            model.pluginPopupAction(buttonId, state: state)
+        }
+    }
+
+    private func flash(_ id: String, in state: PopupState) {
+        state.flashed = id
+        Task { @MainActor in
+            try? await Task.sleep(for: .seconds(1.5))
+            if state.flashed == id { state.flashed = nil }
+        }
+    }
+
+    /// ntfy `http` action buttons: no cookies, no cache, never the server's credentials.
+    static let actionSession: URLSession = {
+        let c = URLSessionConfiguration.ephemeral
+        c.httpCookieStorage = nil
+        c.urlCache = nil
+        return URLSession(configuration: c)
+    }()
 
     static func describe(_ e: Effect) -> String {
         switch e {

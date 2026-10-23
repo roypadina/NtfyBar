@@ -60,6 +60,19 @@ final class AppModel {
         performer.showPopup(PopupRequest(message: m, label: label(for: m.topicId), settings: settings), playSound: false)
     }
 
+    /// "Edit rules file…": write the current rules first so there is always a file to edit.
+    func openRulesFile() {
+        if !FileManager.default.fileExists(atPath: engine.store.rulesURL.path) {
+            try? engine.store.saveRules(engine.rules)
+        }
+        NSWorkspace.shared.open(engine.store.rulesURL)
+    }
+
+    // shortcut: M2 — plugin popups arrive in M3.
+    func pluginPopupAction(_ buttonId: String, state: PopupState) {
+        PopupPanel.dismiss(state)
+    }
+
     /// Registered once, and only for the installed copy: a dev build in dist/ must never become
     /// the login item.
     private func registerLoginItemOnce() {
