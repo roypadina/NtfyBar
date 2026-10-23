@@ -20,6 +20,7 @@ struct DispatcherTests {
             switch $0 {
             case .notify: "notify"
             case .popup: "popup"
+            case .pluginPopup: "pluginPopup"
             case .summaryPopup: "summaryPopup"
             case .summaryNotification: "summaryNotification"
             case .floodNotification: "floodNotification"

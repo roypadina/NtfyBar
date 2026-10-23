@@ -1,0 +1,40 @@
+{
+  "id": "com.ntfybar.json-fields",
+  "name": "JSON Fields",
+  "version": "1.0.0",
+  "description": "Match JSON messages by a field's value, and show a JSON message as a table with the field's previous value.",
+  "author": { "name": "NtfyBar", "url": "https://github.com/roypadina/NtfyBar-Plugins" },
+  "apiVersion": 1,
+  "minAppVersion": "1.0.0",
+  "entry": "main.js",
+  "files": ["plugin.json", "main.js"],
+  "permissions": ["ui", "history.read"],
+  "permissionReasons": {
+    "ui": "Shows the JSON message as a table in a popup.",
+    "history.read": "Finds the field's previous value in earlier messages of the same topic."
+  },
+  "providers": [
+    {
+      "id": "com.ntfybar.json-fields.equals",
+      "kind": "condition",
+      "name": "JSON field equals",
+      "description": "The message is JSON and the field (dot path) equals the value.",
+      "function": "fieldEquals",
+      "params": [
+        { "key": "field", "label": "Field (dot path)", "kind": "text", "placeholder": "status.code" },
+        { "key": "value", "label": "Value", "kind": "text", "placeholder": "failed" }
+      ]
+    },
+    {
+      "id": "com.ntfybar.json-fields.table",
+      "kind": "action",
+      "name": "Show JSON as a table",
+      "description": "Popup listing the JSON fields, plus the previous value of one field.",
+      "function": "showTable",
+      "params": [
+        { "key": "field", "label": "Field to compare (optional)", "kind": "text", "placeholder": "temperature" }
+      ]
+    }
+  ],
+  "popup": { "engine": "declarative" }
+}

@@ -1,0 +1,30 @@
+{
+  "id": "com.ntfybar.ack-button",
+  "name": "ACK Button",
+  "version": "1.0.0",
+  "description": "Popup with an ACK button that sends a short acknowledgement back to the topic the alert came from.",
+  "author": { "name": "NtfyBar", "url": "https://github.com/roypadina/NtfyBar-Plugins" },
+  "apiVersion": 1,
+  "minAppVersion": "1.0.0",
+  "entry": "main.js",
+  "files": ["plugin.json", "main.js"],
+  "permissions": ["ui", "publish", "storage"],
+  "permissionReasons": {
+    "ui": "Shows the popup with the ACK button.",
+    "publish": "Sends your ACK reply to the topic the alert came from, only when you press ACK.",
+    "storage": "Remembers which messages you already acknowledged."
+  },
+  "providers": [
+    {
+      "id": "com.ntfybar.ack-button.show",
+      "kind": "action",
+      "name": "Show ACK popup",
+      "description": "Popup with an ACK button that replies on the same topic.",
+      "function": "showAck",
+      "params": [
+        { "key": "reply", "label": "Reply text", "kind": "text", "placeholder": "ACK {title}" }
+      ]
+    }
+  ],
+  "popup": { "engine": "declarative" }
+}

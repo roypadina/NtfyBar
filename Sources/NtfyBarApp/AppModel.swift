@@ -15,7 +15,8 @@ final class AppModel {
 
     private init() {
         do {
-            engine = try Engine()
+            let version = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "1.0.0"
+            engine = try Engine(bundledPlugins: Bundle.main.resourceURL?.appendingPathComponent("BundledPlugins"), appVersion: version)
         } catch {
             let alert = NSAlert()
             alert.messageText = "NtfyBar can't open its data folder"
@@ -30,6 +31,8 @@ final class AppModel {
         started = true
         notifier.setUp(model: self)
         engine.onEffects = { [weak self] in self?.performer.perform($0) }
+        engine.onCopy = { [weak self] in self?.performer.copy($0) }
+        engine.onOpen = { [weak self] in self?.performer.open($0.absoluteString) }
         engine.start()
         engine.startNetworkMonitoring()
         NSWorkspace.shared.notificationCenter.addObserver(forName: NSWorkspace.didWakeNotification, object: nil,
@@ -68,9 +71,22 @@ final class AppModel {
         NSWorkspace.shared.open(engine.store.rulesURL)
     }
 
-    // shortcut: M2 — plugin popups arrive in M3.
+    /// A plugin popup button: the plugin answers with close or a new popup (same panel).
     func pluginPopupAction(_ buttonId: String, state: PopupState) {
-        PopupPanel.dismiss(state)
+        let c = state.content
+        guard let ref = c.plugin else { PopupPanel.dismiss(state); return }
+        switch engine.pluginPopupAction(ref, buttonId: buttonId, topicId: c.topicId, messageId: c.messageId) {
+        case .close:
+            PopupPanel.dismiss(state)
+        case let .replace(spec):
+            guard let topicId = c.topicId, let messageId = c.messageId else { PopupPanel.dismiss(state); return }
+            let req = PluginPopupRequest(pluginId: ref.pluginId, pluginName: engine.pluginName(ref.pluginId), spec: spec,
+                                         topicId: topicId, messageId: messageId, label: label(for: topicId))
+            var next = req.content
+            next.key = c.key
+            state.content = next
+            PopupPanel.relayout()
+        }
     }
 
     /// Registered once, and only for the installed copy: a dev build in dist/ must never become

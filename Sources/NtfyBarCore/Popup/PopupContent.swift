@@ -38,13 +38,18 @@ public struct PopupContent: Equatable, Sendable {
         public var action: Action
         /// ntfy `clear`: dismiss the popup after the action succeeds.
         public var clears: Bool
+        /// Set for buttons defined by the message sender: shown with a glyph and the target host,
+        /// so they can't pass for NtfyBar's own buttons.
+        public var senderHost: String?
 
-        public init(id: String, label: String, style: PopupButton.Style = .default, action: Action, clears: Bool = false) {
+        public init(id: String, label: String, style: PopupButton.Style = .default, action: Action, clears: Bool = false,
+                    senderHost: String? = nil) {
             self.id = id
             self.label = label
             self.style = style
             self.action = action
             self.clears = clears
+            self.senderHost = senderHost
         }
     }
 
@@ -67,13 +72,20 @@ public struct PopupContent: Equatable, Sendable {
     public var messageId: String?
     /// What ⌘C copies.
     public var copyText: String?
+    /// Set for plugin popups: which plugin to call back, with the state it returned.
+    public var plugin: PluginRef? = nil
+
+    public struct PluginRef: Equatable, Sendable {
+        public var pluginId: String
+        public var state: JSONValue
+    }
 
     public static func == (a: PopupContent, b: PopupContent) -> Bool {
         a.key == b.key && a.header == b.header && a.date == b.date && a.priority == b.priority && a.icon == b.icon
             && a.accent == b.accent && a.title == b.title && a.blocks == b.blocks && a.tags == b.tags
             && a.attachment?.label == b.attachment?.label && a.attachment?.url == b.attachment?.url && a.buttons == b.buttons
             && a.timeoutSec == b.timeoutSec && a.level == b.level && a.position == b.position && a.topicId == b.topicId
-            && a.messageId == b.messageId && a.copyText == b.copyText
+            && a.messageId == b.messageId && a.copyText == b.copyText && a.plugin == b.plugin
     }
 
     /// Priority as word + symbol + accent together, so colour is never the only signal.
@@ -97,11 +109,13 @@ public struct PopupContent: Equatable, Sendable {
             switch a.action {
             case "view":
                 if let url = SafeOpen.url(a.url) {
-                    buttons.append(Button(id: "ntfy-\(i)", label: a.label, action: .open(url), clears: a.clear ?? false))
+                    buttons.append(Button(id: "ntfy-\(i)", label: a.label, action: .open(url), clears: a.clear ?? false,
+                                          senderHost: url.host() ?? ""))
                 }
             case "http":
-                if HTTPAction.request(for: a) != nil {
-                    buttons.append(Button(id: "ntfy-\(i)", label: a.label, action: .http(a), clears: a.clear ?? false))
+                if let r = HTTPAction.request(for: a) {
+                    buttons.append(Button(id: "ntfy-\(i)", label: a.label, action: .http(a), clears: a.clear ?? false,
+                                          senderHost: r.url?.host() ?? ""))
                 }
             default:
                 break
@@ -116,10 +130,10 @@ public struct PopupContent: Equatable, Sendable {
         }
         if s.showCopy, !m.body.isEmpty { buttons.append(Button(id: "copy", label: "Copy", action: .copy(m.body))) }
         if s.showOpen, let url = SafeOpen.url(m.ntfy.click) { buttons.append(Button(id: "open", label: "Open", action: .open(url))) }
-        // Exactly one prominent button: the sender's first action, else Open, else Dismiss.
-        if let first = buttons.firstIndex(where: { $0.id.hasPrefix("ntfy-") || $0.id == "open" }),
-           !buttons.contains(where: { $0.style == .prominent }) {
-            buttons[first].style = .prominent
+        // Exactly one prominent (Return) button: Open, else Dismiss — never a sender-defined action,
+        // whose label and target the sender chooses.
+        if let open = buttons.firstIndex(where: { $0.id == "open" }), !buttons.contains(where: { $0.style == .prominent }) {
+            buttons[open].style = .prominent
         }
         let dismissStyle: PopupButton.Style = buttons.contains { $0.style == .prominent } ? .default : .prominent
         buttons.append(Button(id: "dismiss", label: "Dismiss", style: dismissStyle, action: .dismiss))

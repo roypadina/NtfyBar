@@ -208,24 +208,37 @@ public struct TopicConfig: Codable, Equatable, Identifiable, Sendable {
     }
 
     public var displayLabel: String { label.isEmpty ? "Untitled topic" : label }
+
+    /// "ntfybar-" + 22 base62 characters (~131 bits): unguessable on a public server.
+    public static func randomName() -> String {
+        let alphabet = Array("ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789")
+        var g = SystemRandomNumberGenerator()
+        return "ntfybar-" + String((0..<22).map { _ in alphabet[Int.random(in: 0..<alphabet.count, using: &g)] })
+    }
 }
 
 public struct PluginGrant: Codable, Equatable, Sendable {
+    /// Permissions currently allowed (the user can switch single ones off).
     public var permissions: [String]
+    /// Everything the user was shown and agreed to. A plugin update that declares anything beyond
+    /// this needs consent again.
+    public var consented: [String]
     /// Where the consented package came from: "bundled", "installed" or "local:<path>". A package
     /// with the same id from a different source gets no grants (and needs its own consent).
     public var source: String
 
-    public init(permissions: [String], source: String) {
+    public init(permissions: [String], consented: [String]? = nil, source: String) {
         self.permissions = permissions
+        self.consented = consented ?? permissions
         self.source = source
     }
 
-    private enum CodingKeys: String, CodingKey { case permissions, source }
+    private enum CodingKeys: String, CodingKey { case permissions, consented, source }
 
     public init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
         permissions = c.value(.permissions, [])
+        consented = c.value(.consented, permissions)
         source = c.value(.source, "")
     }
 }
@@ -237,10 +250,12 @@ public struct PluginSettings: Codable, Equatable, Sendable {
     public var grants: [String: PluginGrant] = [:]
     public var localFolders: [String] = []
     public var marketplaces: [String] = [PluginSettings.officialMarketplace]
+    /// Installed package id → the marketplace URL it came from (for the "Unverified source" badge).
+    public var installedFrom: [String: String] = [:]
 
     public init() {}
 
-    private enum CodingKeys: String, CodingKey { case disabledIds, grants, localFolders, marketplaces }
+    private enum CodingKeys: String, CodingKey { case disabledIds, grants, localFolders, marketplaces, installedFrom }
 
     public init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
@@ -248,6 +263,7 @@ public struct PluginSettings: Codable, Equatable, Sendable {
         grants = c.value(.grants, [:])
         localFolders = c.value(.localFolders, [])
         marketplaces = c.value(.marketplaces, [PluginSettings.officialMarketplace])
+        installedFrom = c.value(.installedFrom, [:])
     }
 }
 

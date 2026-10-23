@@ -101,13 +101,15 @@ public final class Dispatcher {
     }
 
     private static func isPopup(_ e: Effect) -> Bool {
-        if case .popup = e { return true }
-        return false
+        switch e {
+        case .popup, .pluginPopup: true
+        default: false
+        }
     }
 
     private static func isAlert(_ e: Effect) -> Bool {
         switch e {
-        case .popup, .notify: true
+        case .popup, .pluginPopup, .notify: true
         default: false
         }
     }

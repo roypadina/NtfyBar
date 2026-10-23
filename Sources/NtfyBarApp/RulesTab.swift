@@ -80,7 +80,6 @@ struct RuleEditor: View {
         Form {
             Section("Rule") {
                 TextField("Name", text: $draft.name)
-                Toggle("Enabled", isOn: $draft.enabled)
                 LabeledContent("Topics") {
                     VStack(alignment: .leading) {
                         Toggle("Any topic", isOn: Binding(get: { draft.topicIds.isEmpty }, set: { if $0 { draft.topicIds = [] } }))
@@ -115,7 +114,9 @@ struct RuleEditor: View {
     }
 
     private func save() {
-        let rule = draft
+        var rule = draft
+        // The list's checkbox owns "enabled"; don't overwrite it with this editor's older copy.
+        rule.enabled = engine.rules.rules.first { $0.id == rule.id }?.enabled ?? true
         try? engine.updateRules { rs in
             if let i = rs.firstIndex(where: { $0.id == rule.id }) { rs[i] = rule } else { rs.append(rule) }
         }
@@ -138,10 +139,10 @@ struct StepList: View {
                     HStack {
                         Picker("", selection: $step.providerId) {
                             if !catalog.contains(where: { $0.id == step.providerId }) {
-                                Text("Unknown: \(step.providerId)").tag(step.providerId)
+                                Text("\(step.providerId) (plugin unavailable)").tag(step.providerId)
                             }
                             ForEach(catalog) { d in
-                                Text(d.packageId == nil ? d.name : "\(d.name) (plugin)").tag(d.id)
+                                Text(d.packageId.map { "\(engine.pluginName($0)) › \(d.name)" } ?? d.name).tag(d.id)
                             }
                         }
                         .labelsHidden()

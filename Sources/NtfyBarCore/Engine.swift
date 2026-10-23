@@ -13,11 +13,16 @@ public final class Engine {
     public private(set) var recent: [Message] = []
 
     public private(set) var rules: RulesFile
+    public private(set) var pluginPackages: [PluginManager.Package] = []
 
     @ObservationIgnored public let store: ConfigStore
     @ObservationIgnored public let history: HistoryStore
     @ObservationIgnored public let dispatcher: Dispatcher
     @ObservationIgnored public var onEffects: (([Effect]) -> Void)?
+    /// AppKit side effects for plugins (clipboard, browser), set by the app.
+    @ObservationIgnored public var onCopy: ((String) -> Void)?
+    @ObservationIgnored public var onOpen: ((URL) -> Void)?
+    @ObservationIgnored public private(set) var plugins: PluginManager!
 
     @ObservationIgnored private var streams: [UUID: NtfyStream] = [:]
     @ObservationIgnored private var signatures: [UUID: String] = [:]
@@ -41,7 +46,8 @@ public final class Engine {
 
     public init(store: ConfigStore = ConfigStore(), session: URLSession = Engine.makeSession(),
                 timing: NtfyStream.Timing = NtfyStream.Timing(), catchUpDebounce: Double = 2,
-                dispatcher: Dispatcher = Dispatcher(), now: @escaping @Sendable () -> Date = { Date() }) throws {
+                dispatcher: Dispatcher = Dispatcher(), bundledPlugins: URL? = nil, appVersion: String = "1.0.0",
+                now: @escaping @Sendable () -> Date = { Date() }) throws {
         try store.ensureDirectory()
         self.store = store
         self.config = store.loadConfig()
@@ -55,6 +61,9 @@ public final class Engine {
         self.catchUpDebounce = catchUpDebounce
         self.now = now
         dispatcher.rules.rules = rules.rules
+        plugins = PluginManager(bundledDirectory: bundledPlugins, installedDirectory: store.pluginsDirectory, appVersion: appVersion,
+                                registry: dispatcher.rules.registry, host: self)
+        reloadPlugins()
         refreshCounters()
     }
 
@@ -135,7 +144,85 @@ public final class Engine {
         config = store.loadConfig()
         rules = store.loadRules()
         dispatcher.rules.rules = rules.rules
+        reloadPlugins()
         applyStreams()
+    }
+
+    // MARK: plugins
+
+    public func reloadPlugins() {
+        plugins.reload(config: config)
+        pluginPackages = plugins.packages
+    }
+
+    public func pluginName(_ id: String) -> String { plugins.package(id)?.manifest?.name ?? id }
+
+    /// The user agreed to everything the manifest declares, for this exact source.
+    public func consent(to package: PluginManager.Package) throws {
+        guard let m = package.manifest else { return }
+        try update { c in
+            c.plugins.grants[m.id] = PluginGrant(permissions: m.permissions, consented: m.permissions, source: package.source.key)
+            c.plugins.disabledIds.removeAll { $0 == m.id }
+        }
+        reloadPlugins()
+    }
+
+    /// Per-permission switch; revoking rebuilds the plugin's context without that method.
+    public func setPermission(_ permission: Permission, pluginId: String, granted: Bool) throws {
+        try update { c in
+            guard var g = c.plugins.grants[pluginId] else { return }
+            g.permissions.removeAll { $0 == permission.rawValue }
+            if granted, g.consented.contains(permission.rawValue) { g.permissions.append(permission.rawValue) }
+            c.plugins.grants[pluginId] = g
+        }
+        reloadPlugins()
+    }
+
+    public func setPluginEnabled(_ id: String, _ enabled: Bool) throws {
+        try update { c in
+            c.plugins.disabledIds.removeAll { $0 == id }
+            if !enabled { c.plugins.disabledIds.append(id) }
+        }
+        reloadPlugins()
+    }
+
+    /// Installed (marketplace) packages only; bundled ones are disabled instead.
+    public func uninstallPlugin(_ id: String) throws {
+        guard PluginManifest.isValidId(id) else { return }
+        try? FileManager.default.removeItem(at: store.pluginsDirectory.appendingPathComponent(id, isDirectory: true))
+        try? FileManager.default.removeItem(at: store.pluginDataDirectory.appendingPathComponent(id + ".json"))
+        try update { c in
+            c.plugins.grants[id] = nil
+            c.plugins.installedFrom[id] = nil
+            c.plugins.disabledIds.removeAll { $0 == id }
+        }
+        reloadPlugins()
+    }
+
+    /// Writes a verified marketplace package and records the user's consent in one go.
+    public func install(_ prepared: PreparedInstall) throws {
+        try Marketplace.commit(prepared, into: store.pluginsDirectory)
+        let m = prepared.manifest
+        try update { c in
+            c.plugins.installedFrom[m.id] = prepared.marketplaceURL
+            c.plugins.grants[m.id] = PluginGrant(permissions: m.permissions, consented: m.permissions,
+                                                 source: PluginManager.Source.installed.key)
+            c.plugins.disabledIds.removeAll { $0 == m.id }
+        }
+        reloadPlugins()
+    }
+
+    /// A plugin popup button was pressed: call the plugin's onPopupAction with the message that
+    /// triggered the popup. Unknown plugin/message → close.
+    public func pluginPopupAction(_ ref: PopupContent.PluginRef, buttonId: String, topicId: UUID?, messageId: String?) -> PopupActionResult {
+        guard let runtime = plugins.runtime(ref.pluginId), let topicId, let messageId,
+              let topic = config.topic(topicId), let m = history.message(topicId: topicId, id: messageId) else { return .close }
+        do {
+            return try runtime.popupAction(ctx: ProviderContext(message: m, topic: topic, config: config), buttonId: buttonId, state: ref.state)
+        } catch {
+            Log.plugins.error("\(ref.pluginId, privacy: .public) onPopupAction: \(String(describing: error), privacy: .public)")
+            return .close
+        }
     }
 
     // MARK: history actions
@@ -174,10 +261,15 @@ public final class Engine {
         }
         let priority = config.quietHours.cap(req.priority, at: now())
         let signature = Self.signature(topicId: req.topicId, title: req.title, message: req.message)
+        pruneOwn()
         ownPending[signature] = now()
         do {
             let id = try await publisher.publish(req, server: server, topic: topic.topic, priority: priority)
+            // The POST returned: from now on only the exact id counts as our echo. An echo that
+            // raced ahead already consumed the signature.
+            ownPending[signature] = nil
             if let id { ownIds["\(req.topicId.uuidString)/\(id)"] = now() }
+            pruneOwn()
             return id
         } catch {
             ownPending[signature] = nil
@@ -190,10 +282,20 @@ public final class Engine {
         "\(topicId.uuidString)\u{1F}\(title ?? "")\u{1F}\(message)"
     }
 
-    private func isOwnEcho(_ m: Message) -> Bool {
+    /// Bounded: entries live 2 minutes, at most 1000 ids.
+    private func pruneOwn() {
         let cutoff = now().addingTimeInterval(-120)
         ownIds = ownIds.filter { $0.value > cutoff }
         ownPending = ownPending.filter { $0.value > cutoff }
+        if ownIds.count > 1000 {
+            ownIds = Dictionary(uniqueKeysWithValues: ownIds.sorted { $0.value > $1.value }.prefix(1000).map { ($0.key, $0.value) })
+        }
+    }
+
+    var ownEchoCount: Int { ownIds.count + ownPending.count }
+
+    private func isOwnEcho(_ m: Message) -> Bool {
+        pruneOwn()
         if ownIds.removeValue(forKey: "\(m.topicId.uuidString)/\(m.ntfy.id)") != nil { return true }
         let sig = Self.signature(topicId: m.topicId, title: m.title, message: m.body)
         return ownPending.removeValue(forKey: sig) != nil
@@ -316,4 +418,27 @@ public final class Engine {
         }
         refreshCounters()
     }
+}
+
+extension Engine: PluginHost {
+    public var pluginDataDirectory: URL { store.pluginDataDirectory }
+
+    public func isGranted(_ pluginId: String, _ permission: Permission) -> Bool {
+        guard let pkg = plugins?.package(pluginId), pkg.state == .active, let m = pkg.manifest else { return false }
+        return PluginManager.effectivePermissions(m, source: pkg.source, config: config).contains(permission)
+    }
+
+    public func history(topicId: UUID, before: Int64?, after: Int64?, limit: Int) -> [Message] {
+        if let before { return history.older(topicId: topicId, before: before, limit: limit) }
+        if let after { return history.newer(topicId: topicId, after: after, limit: limit) }
+        return history.recent(topicId: topicId, limit: limit)
+    }
+
+    /// Fire-and-forget; the 10-per-minute limit is per plugin, quiet hours and the loop guard apply.
+    public func publish(pluginId: String, _ request: PublishRequest) {
+        Task { try? await self.publish(request, rateKey: pluginId) }
+    }
+
+    public func copy(_ text: String) { onCopy?(text) }
+    public func open(_ url: URL) { if SafeOpen.isAllowed(url) { onOpen?(url) } }
 }

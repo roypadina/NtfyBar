@@ -24,6 +24,8 @@ final class EffectPerformer {
                 model.notifier.post(NotificationText.flood(label: label), category: Notifier.summaryCategory)
             case let .popup(request):
                 showPopup(request, playSound: false)
+            case let .pluginPopup(request):
+                PopupPanel.show(request.content) { [weak self] button, state in self?.handle(button, in: state) }
             case let .summaryPopup(topicId, label, count):
                 showSummaryPopup(topicId: topicId, label: label, count: count)
             case let .copy(text):
@@ -131,6 +133,7 @@ final class EffectPerformer {
         switch e {
         case let .notify(m, _): "notify \(m.ntfy.id)"
         case let .popup(r): "popup \(r.message.ntfy.id)"
+        case let .pluginPopup(r): "pluginPopup \(r.pluginId)"
         case let .summaryPopup(_, _, n): "summaryPopup \(n)"
         case let .summaryNotification(_, _, n): "summaryNotification \(n)"
         case .floodNotification: "floodNotification"
