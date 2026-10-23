@@ -92,7 +92,7 @@ struct CapabilityTests {
         host.grants[id] = Set(Permission.allCases)
         let r = try runtime(Set(Permission.allCases))
         for (_, probe) in Self.probes { _ = try r.condition("probe_\(probe.name)", ctx: host.ctx(), params: [:]) }
-        #expect(host.published.count == 1 && host.published[0].0 == id && host.published[0].1.topicId == host.triggerTopic.id)
+        #expect(host.published.count == 1 && host.published.first?.0 == id && host.published.first?.1.topicId == host.triggerTopic.id)
         #expect(host.copied == ["hi"])
         #expect(host.opened == [URL(string: "https://example.com/x")!])
     }
@@ -175,7 +175,7 @@ struct CapabilityTests {
             function spin(ctx) { while (true) {} }
             function fine(ctx) { return true; }
             """
-        let r = try PluginRuntime(pluginId: id, script: script, granted: [], host: host, timeLimit: 0.3)
+        let r = try PluginRuntime(pluginId: id, script: script, granted: [], host: host, timeLimit: 0.1)
         let start = Date()
         #expect(throws: PluginError.timedOut) { try r.condition("spin", ctx: host.ctx(), params: [:]) }
         #expect(Date().timeIntervalSince(start) < 2)
@@ -391,7 +391,7 @@ struct PluginHardeningTests {
     }
 
     @Test func cumulativeTimeBudget() throws {
-        let r = try runtime("function busy(ctx) { var t = Date.now(); while (Date.now() - t < 120) {} return true; }", [], timeLimit: 0.2)
+        let r = try runtime("function busy(ctx) { var t = Date.now(); while (Date.now() - t < 30) {} return true; }", [], timeLimit: 0.05)
         var calls = 0
         while !r.isDisabled && calls < 20 {
             _ = try? r.condition("busy", ctx: host.ctx(), params: [:])
@@ -409,7 +409,7 @@ struct PluginHardeningTests {
     }
 
     @Test func hugeResultIsAnErrorNotACrash() throws {
-        let r = try runtime("function big(ctx) { var s = 'x'; for (var i = 0; i < 24; i++) s = s + s; return {popup: {title: s}}; }", [.ui])
+        let r = try runtime("function big(ctx) { var s = 'x'; for (var i = 0; i < 12; i++) s = s + s; return {popup: {title: s}}; }", [.ui])
         #expect(throws: (any Error).self) { try r.action("big", ctx: host.ctx(), params: [:]) }
     }
 

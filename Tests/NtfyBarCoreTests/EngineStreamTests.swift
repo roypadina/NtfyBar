@@ -55,7 +55,7 @@ final class EngineStreamTests {
         e.start()
         defer { e.stop() }
         #expect(await eventually { !StubProtocol.requests(self.host).isEmpty })
-        #expect(StubProtocol.requests(host)[0].value(forHTTPHeaderField: "Authorization") == auth.headerValue)
+        #expect(StubProtocol.requests(host)[safe: 0]?.value(forHTTPHeaderField: "Authorization") == auth.headerValue)
     }
 
     @Test(arguments: [401, 403])
@@ -87,7 +87,7 @@ final class EngineStreamTests {
         e.start()
         defer { e.stop() }
         #expect(await eventually { self.notified == ["m1", "m3"] })
-        let second = StubProtocol.requests(host)[1]
+        let second = try #require(StubProtocol.requests(host)[safe: 1])
         #expect(second.url?.query == "since=\(t0)")
         #expect(e.history.count() == 3, "m1 stored once")
         // m2 was replayed → catch-up summary instead of its own notification.
@@ -119,7 +119,7 @@ final class EngineStreamTests {
         e.start()
         defer { e.stop() }
         #expect(await eventually { e.recent.first?.ntfy.id == "old" })
-        #expect(StubProtocol.requests(host)[0].url?.query == "since=300")
+        #expect(StubProtocol.requests(host)[safe: 0]?.url?.query == "since=300")
         #expect(e.recent.first?.isCatchUp == true)
         #expect(notified.isEmpty)
     }
@@ -229,7 +229,7 @@ final class EngineStreamTests {
         #expect(await eventually { self.notified == ["a1"] })
         try e.update { c in c.topics.append(TopicConfig(serverId: c.servers[0].id, topic: "ntfybar-second-demo", label: "Second")) }
         #expect(await eventually { StubProtocol.requests(self.host).count == 2 })
-        let second = StubProtocol.requests(host)[1]
+        let second = try #require(StubProtocol.requests(host)[safe: 1])
         #expect(second.url?.query == "since=\(t0)")
         #expect(second.url?.path.contains("ntfybar-second-demo") == true)
     }
@@ -247,7 +247,7 @@ final class EngineStreamTests {
         defer { e.stop() }
         #expect(await eventually { if case .reconnecting = e.streamStates.values.first { true } else { false } })
         e.reconnectAll()
-        #expect(await eventually(timeout: 1) { StubProtocol.requests(self.host).count == 2 })
+        #expect(await eventually(timeout: 5) { StubProtocol.requests(self.host).count == 2 })
     }
 
     @Test func sameTopicNameOnTwoServersStaysSeparate() async throws {

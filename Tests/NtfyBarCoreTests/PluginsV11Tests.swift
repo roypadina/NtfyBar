@@ -182,7 +182,8 @@ final class ScheduledPublishTests {
         let evening = cal.date(bySettingHour: 19, minute: 50, second: 0, of: Date())!  // +20 min = inside 20:00–09:00
         let e = try Engine(store: store, session: StubProtocol.session(), now: { evening })
         try await e.publish(PublishRequest(topicId: topicId, message: "snoozed", priority: 5, delay: 1200), rateKey: nil)
-        let body = try #require(JSONSerialization.jsonObject(with: StubProtocol.bodies(host)[0]) as? [String: Any])
+        let sent = try #require(StubProtocol.bodies(host).first)
+        let body = try #require(JSONSerialization.jsonObject(with: sent) as? [String: Any])
         #expect(body["priority"] as? Int == 4, "capped for the time it will arrive")
         #expect(body["delay"] as? String == "1200s")
         #expect(e.ownEchoCount == 0, "a scheduled message is meant to come back and run rules")

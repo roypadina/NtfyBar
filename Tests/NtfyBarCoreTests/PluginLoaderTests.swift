@@ -147,7 +147,7 @@ struct BundledExampleTests {
         let result = try m.runtime("com.ntfybar.ack-button")!.popupAction(ctx: host.ctx(msg), buttonId: "ack", state: req.spec.state)
         #expect(result == .close)
         #expect(host.published.count == 1)
-        let reply = host.published[0].1
+        let reply = try #require(host.published.first).1
         #expect(reply.topicId == host.triggerTopic.id && reply.message == "ACK Disk full" && reply.priority == 2)
         #expect(reply.tags.contains("ntfybar-ack"))
         // Its own reply never gets an ACK popup; an acknowledged alert shows a badge, no button.
