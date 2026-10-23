@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Documentation (wiki)
+    url: https://github.com/roypadina/NtfyBar/wiki
+    about: Setup, rules, plugins, troubleshooting and FAQ.
+  - name: Plugin problems
+    url: https://github.com/roypadina/NtfyBar-Plugins/issues
+    about: Issues with a specific marketplace plugin.

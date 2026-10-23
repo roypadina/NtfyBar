@@ -1,0 +1,53 @@
+name: Bug report
+description: Something isn't working as expected
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: Please **don't paste topic names, server addresses or credentials** — they work like passwords. Use your topic's label instead.
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened?
+      description: What did you expect, and what happened instead?
+    validations:
+      required: true
+  - type: textarea
+    id: repro
+    attributes:
+      label: Steps to reproduce
+      placeholder: |
+        1. Add a topic with popups on
+        2. Send: curl -H "Priority: urgent" -d "test" ntfy.sh/<topic>
+        3. ...
+    validations:
+      required: true
+  - type: input
+    id: macos
+    attributes:
+      label: macOS version
+      placeholder: "15.3"
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: NtfyBar version and install method
+      placeholder: "1.0.0, Homebrew"
+    validations:
+      required: true
+  - type: dropdown
+    id: server
+    attributes:
+      label: Server
+      options:
+        - ntfy.sh
+        - Self-hosted
+    validations:
+      required: true
+  - type: textarea
+    id: logs
+    attributes:
+      label: Logs (optional)
+      description: "`/usr/bin/log show --last 15m --predicate 'subsystem == \"com.padina.ntfybar\"'` — check it contains nothing private before pasting."
+      render: text
