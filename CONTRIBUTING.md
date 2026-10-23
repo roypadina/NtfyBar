@@ -73,6 +73,14 @@ Plugin authoring lives in [NtfyBar-Plugins](https://github.com/roypadina/NtfyBar
 to the plugin runtime or permission model here need tests in `PluginTests.swift` — every permission
 must stay *absent → fails, granted → works, revoked → fails*.
 
+## Feature requests and bugs
+
+- **Feature requests:** [open one](https://github.com/roypadina/NtfyBar/issues/new?template=feature_request.yml) and say what you're trying to do; that matters more than the exact feature. Search the [open requests](https://github.com/roypadina/NtfyBar/issues?q=is%3Aissue+is%3Aopen+label%3Aenhancement) first and 👍 an existing one if it's there.
+- **Bugs:** use the [bug report](https://github.com/roypadina/NtfyBar/issues/new?template=bug_report.yml).
+- **Ko-fi supporters:** add your Ko-fi name to the request and it goes to the front of my queue. It's a thank-you, not a purchase: no promise on what ships or when.
+- **Bigger changes:** open an issue before the PR so we agree on the shape first. Small, focused PRs can come straight in.
+- Replies are best effort, evenings and weekends. I read everything.
+
 ## Code of Conduct
 
 By taking part you agree to the [Code of Conduct](CODE_OF_CONDUCT.md).

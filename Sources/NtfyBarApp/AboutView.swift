@@ -61,6 +61,27 @@ struct AboutView: View {
 
             Divider()
 
+            VStack(spacing: 8) {
+                Text("Have an idea, or want to help build it?").font(.headline)
+                Text("Feature requests and pull requests are welcome. Ko-fi supporters go to the front of the queue.")
+                    .font(.callout)
+                    .foregroundStyle(.secondary)
+                    .multilineTextAlignment(.center)
+                    .fixedSize(horizontal: false, vertical: true)
+
+                HStack {
+                    Link(destination: URL(string: "https://github.com/roypadina/NtfyBar/issues/new?template=feature_request.yml")!) {
+                        Text("Request a feature").frame(minWidth: 120)
+                    }
+                    .buttonStyle(.bordered)
+
+                    Link(destination: URL(string: "https://github.com/roypadina/NtfyBar/blob/main/CONTRIBUTING.md")!) {
+                        Text("Contribute").frame(minWidth: 90)
+                    }
+                    .buttonStyle(.bordered)
+                }
+            }
+
             VStack(spacing: 2) {
                 Text("© Roy Padina · MIT")
                 Text("Emoji shortcodes from ntfy (Apache-2.0) and GitHub gemoji (MIT). Not affiliated with ntfy.")
