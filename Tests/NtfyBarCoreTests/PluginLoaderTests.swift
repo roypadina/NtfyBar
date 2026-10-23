@@ -124,14 +124,15 @@ struct BundledExampleTests {
 
     func load(_ grants: [String: [String]]) -> PluginManager {
         for (id, perms) in grants { host.config.plugins.grants[id] = PluginGrant(permissions: perms, source: "bundled") }
-        let m = PluginManager(bundledDirectory: bundledPluginsDir, installedDirectory: tempDir(), appVersion: "1.0.0", registry: registry, host: host)
+        let m = PluginManager(bundledDirectory: bundledPluginsDir, installedDirectory: tempDir(), appVersion: "1.1.0", registry: registry, host: host)
         m.reload(config: host.config)
         return m
     }
 
     @Test func bothValidateAndWaitForConsent() {
         let m = load([:])
-        #expect(m.packages.map(\.id).sorted() == ["com.ntfybar.ack-button", "com.ntfybar.json-fields"])
+        #expect(m.packages.map(\.id).sorted() == ["com.ntfybar.ack-button", "com.ntfybar.alert-card", "com.ntfybar.extract",
+                                                  "com.ntfybar.history-conditions", "com.ntfybar.json-fields"])
         #expect(m.packages.allSatisfy { $0.state == .needsConsent && $0.errors.isEmpty && $0.verified })
     }
 
@@ -289,7 +290,7 @@ struct MarketplaceRepoTests {
         let dir = tempDir()
         for entry in index.plugins {
             let prepared = try await Marketplace.prepare(entry, marketplaceURL: PluginSettings.officialMarketplace,
-                                                         session: StubProtocol.session(), appVersion: "1.0.0", rawBase: "https://\(host)")
+                                                         session: StubProtocol.session(), appVersion: "1.1.0", rawBase: "https://\(host)")
             try Marketplace.commit(prepared, into: dir)
         }
         let fake = FakeHost()
@@ -297,7 +298,7 @@ struct MarketplaceRepoTests {
             fake.config.plugins.grants[entry.id] = PluginGrant(permissions: entry.permissions, source: "installed")
             fake.config.plugins.installedFrom[entry.id] = PluginSettings.officialMarketplace
         }
-        let m = PluginManager(bundledDirectory: nil, installedDirectory: dir, appVersion: "1.0.0", registry: ProviderRegistry(), host: fake)
+        let m = PluginManager(bundledDirectory: nil, installedDirectory: dir, appVersion: "1.1.0", registry: ProviderRegistry(), host: fake)
         m.reload(config: fake.config)
         #expect(m.packages.count == index.plugins.count)
         #expect(m.packages.allSatisfy { $0.state == .active && $0.errors.isEmpty && $0.verified }, "\(m.packages.map { ($0.id, $0.errors) })")

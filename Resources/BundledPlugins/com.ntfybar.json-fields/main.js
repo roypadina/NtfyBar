@@ -56,3 +56,26 @@ function showTable(ctx, params) {
   }
   return { popup: { title: ctx.message.title || ctx.topic.label, icon: "curlybraces", accent: "info", blocks: blocks } };
 }
+
+// The field's value in the newest earlier message of this topic that has it (undefined if none).
+function previousValue(ctx, field) {
+  var earlier = ntfy.history ? ntfy.history({ limit: 50 }) : [];
+  for (var j = 0; j < earlier.length; j++) {
+    if (earlier[j].id === ctx.message.id) continue;
+    var o = parse(earlier[j].message);
+    if (o) {
+      var v = pick(o, field);
+      if (v !== undefined) return v;
+    }
+  }
+  return undefined;
+}
+
+function fieldChanged(ctx, params) {
+  var obj = parse(ctx.message.message);
+  if (!obj || !params.field) return false;
+  var now = pick(obj, params.field);
+  if (now === undefined) return false;
+  var before = previousValue(ctx, params.field);
+  return before !== undefined && show(before) !== show(now);
+}

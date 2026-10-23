@@ -19,6 +19,18 @@ jobs:
       - name: Test
         run: swift test
 
+      # Bundled plugins are copies of NtfyBar-Plugins entries: they must stay byte-identical, and every
+      # marketplace entry must pass this app's own installer checks.
+      - uses: actions/checkout@v4
+        with:
+          repository: roypadina/NtfyBar-Plugins
+          path: plugins-repo
+
+      - name: Bundled plugins match the marketplace
+        run: |
+          for d in Resources/BundledPlugins/*/; do diff -r "$d" "plugins-repo/plugins/$(basename "$d")"; done
+          NTFYBAR_PLUGINS_REPO="$PWD/plugins-repo" swift test --filter "MarketplaceRepo|RepoExample"
+
       # RELEASE=1: universal, ad-hoc signed app + zip, the same artifact the Homebrew cask installs.
       - name: Package
         run: RELEASE=1 Scripts/package_app.sh

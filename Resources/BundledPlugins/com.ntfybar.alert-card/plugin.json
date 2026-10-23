@@ -1,0 +1,76 @@
+{
+  "id": "com.ntfybar.alert-card",
+  "name": "Alert Card",
+  "version": "1.0.0",
+  "description": "Big alert card with Acknowledge and Snooze, optional auto-dismiss, your choice of position, and a times-today count.",
+  "author": {
+    "name": "NtfyBar",
+    "url": "https://github.com/roypadina/NtfyBar-Plugins"
+  },
+  "apiVersion": 1,
+  "minAppVersion": "1.1.0",
+  "entry": "main.js",
+  "files": [
+    "plugin.json",
+    "main.js"
+  ],
+  "permissions": [
+    "ui",
+    "publish",
+    "storage"
+  ],
+  "permissionReasons": {
+    "ui": "Shows the alert card.",
+    "publish": "Sends the alert to the same topic again after the snooze delay, only when you press Snooze.",
+    "storage": "Counts how often each alert arrived today."
+  },
+  "providers": [
+    {
+      "id": "com.ntfybar.alert-card.show",
+      "kind": "action",
+      "name": "Show alert card",
+      "description": "Alert card with Acknowledge and Snooze; urgent messages always stay until acted on.",
+      "function": "showCard",
+      "params": [
+        {
+          "key": "timeoutSec",
+          "label": "Close after seconds (0 = stays)",
+          "kind": "number",
+          "placeholder": "0"
+        },
+        {
+          "key": "position",
+          "label": "Position",
+          "kind": "choice",
+          "choices": [
+            "topCenter",
+            "topRight"
+          ]
+        },
+        {
+          "key": "level",
+          "label": "Show over",
+          "kind": "choice",
+          "choices": [
+            "floating",
+            "overFullScreen"
+          ]
+        },
+        {
+          "key": "snoozeMin",
+          "label": "Snooze minutes (0 = no Snooze)",
+          "kind": "number",
+          "placeholder": "10"
+        },
+        {
+          "key": "countToday",
+          "label": "Show how many times today",
+          "kind": "bool"
+        }
+      ]
+    }
+  ],
+  "popup": {
+    "engine": "declarative"
+  }
+}

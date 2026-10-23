@@ -196,7 +196,8 @@ final class EngineStreamTests {
         let e = try engine(keepalive: 0.3)
         e.start()
         defer { e.stop() }
-        #expect(await eventually(timeout: 3) { e.history.count() == 10 })
+        // Generous timeout: other suites run busy JavaScript on the main actor in parallel.
+        #expect(await eventually(timeout: 8) { e.history.count() == 10 })
         #expect(StubProtocol.requests(host).count == 1, "messages count as activity, not only keepalives")
     }
 

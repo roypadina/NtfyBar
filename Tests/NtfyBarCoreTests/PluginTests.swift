@@ -25,7 +25,11 @@ final class FakeHost: PluginHost {
     }
 
     func isGranted(_ pluginId: String, _ p: Permission) -> Bool { grants[pluginId]?.contains(p) ?? false }
-    func history(topicId: UUID, before: Int64?, after: Int64?, limit: Int) -> [Message] { Array((messages[topicId] ?? []).prefix(limit)) }
+    func history(topicId: UUID, before: Int64?, after: Int64?, limit: Int) -> [Message] {
+        Array((messages[topicId] ?? []).filter { m in
+            (before.map { m.ntfy.time < $0 } ?? true) && (after.map { m.ntfy.time > $0 } ?? true)
+        }.prefix(limit))
+    }
     func publish(pluginId: String, _ request: PublishRequest) { published.append((pluginId, request)) }
     func copy(_ text: String) { copied.append(text) }
     func open(_ url: URL) { opened.append(url) }

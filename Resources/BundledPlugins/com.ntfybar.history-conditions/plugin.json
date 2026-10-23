@@ -1,0 +1,40 @@
+{
+  "id": "com.ntfybar.history-conditions",
+  "name": "Repeat & Burst",
+  "version": "1.0.0",
+  "description": "Conditions on a topic's recent history: 'not seen recently' to calm flapping alerts, 'burst' to catch a storm.",
+  "author": { "name": "NtfyBar", "url": "https://github.com/roypadina/NtfyBar-Plugins" },
+  "apiVersion": 1,
+  "minAppVersion": "1.1.0",
+  "entry": "main.js",
+  "files": ["plugin.json", "main.js"],
+  "permissions": ["history.read"],
+  "permissionReasons": {
+    "history.read": "Looks at this topic's recent messages to see whether the same alert already came in."
+  },
+  "providers": [
+    {
+      "id": "com.ntfybar.history-conditions.quiet-for",
+      "kind": "condition",
+      "name": "Not seen recently",
+      "description": "True when no message with the same title (or text) arrived in the last N minutes.",
+      "function": "quietFor",
+      "params": [
+        { "key": "minutes", "label": "Minutes", "kind": "number", "placeholder": "30" },
+        { "key": "matchOn", "label": "Same", "kind": "choice", "choices": ["title", "message", "anything"] }
+      ]
+    },
+    {
+      "id": "com.ntfybar.history-conditions.burst",
+      "kind": "condition",
+      "name": "Burst",
+      "description": "True when at least N messages (optionally with the same title) arrived in the last M minutes.",
+      "function": "burst",
+      "params": [
+        { "key": "count", "label": "At least this many messages", "kind": "number", "placeholder": "5" },
+        { "key": "minutes", "label": "Within minutes", "kind": "number", "placeholder": "10" },
+        { "key": "matchOn", "label": "Count", "kind": "choice", "choices": ["anything", "title"] }
+      ]
+    }
+  ]
+}
