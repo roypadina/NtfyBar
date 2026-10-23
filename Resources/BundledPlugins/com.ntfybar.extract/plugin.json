@@ -1,0 +1,43 @@
+{
+  "id": "com.ntfybar.extract",
+  "name": "Extract",
+  "version": "1.0.0",
+  "description": "Pull a piece out of a message with a regular expression: copy it (codes, IPs) or open it in a link (PR numbers, ids).",
+  "author": { "name": "NtfyBar", "url": "https://github.com/roypadina/NtfyBar-Plugins" },
+  "apiVersion": 1,
+  "minAppVersion": "1.1.0",
+  "entry": "main.js",
+  "files": ["plugin.json", "main.js"],
+  "permissions": ["clipboard.write", "openURL"],
+  "permissionReasons": {
+    "clipboard.write": "Copies the part of the message your pattern matched.",
+    "openURL": "Opens the link you built from the matched part."
+  },
+  "providers": [
+    {
+      "id": "com.ntfybar.extract.copy",
+      "kind": "action",
+      "name": "Copy matched text",
+      "description": "Copies the regex match (or one capture group) from the title or message.",
+      "function": "copyMatch",
+      "params": [
+        { "key": "pattern", "label": "Regular expression", "kind": "text", "placeholder": "code:? (\\d{6})" },
+        { "key": "group", "label": "Capture group (0 = whole match)", "kind": "number", "placeholder": "1" },
+        { "key": "field", "label": "Look in", "kind": "choice", "choices": ["message", "title"] }
+      ]
+    },
+    {
+      "id": "com.ntfybar.extract.open",
+      "kind": "action",
+      "name": "Open link with matched text",
+      "description": "Puts the regex match into a link template ({match}) and opens it; http(s) only.",
+      "function": "openMatch",
+      "params": [
+        { "key": "pattern", "label": "Regular expression", "kind": "text", "placeholder": "PR #(\\d+)" },
+        { "key": "group", "label": "Capture group (0 = whole match)", "kind": "number", "placeholder": "1" },
+        { "key": "template", "label": "Link template", "kind": "text", "placeholder": "https://github.com/me/repo/pull/{match}" },
+        { "key": "field", "label": "Look in", "kind": "choice", "choices": ["message", "title"] }
+      ]
+    }
+  ]
+}

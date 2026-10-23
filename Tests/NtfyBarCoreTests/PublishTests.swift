@@ -65,7 +65,7 @@ final class PublishTests {
             PublishRequest(topicId: topicId, title: "T", message: "M", priority: 4, tags: ["a"], click: "file:///etc/passwd"),
             server: server, topic: topic, priority: 4)
         #expect(id == "new1")
-        let req = StubProtocol.requests(host)[0]
+        let req = try #require(StubProtocol.requests(host).first)
         #expect(req.httpMethod == "POST")
         #expect(req.url?.path == "" || req.url?.path == "/")
         #expect(req.value(forHTTPHeaderField: "Authorization") == "Bearer tk_fake")

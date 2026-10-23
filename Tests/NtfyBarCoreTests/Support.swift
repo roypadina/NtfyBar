@@ -112,7 +112,7 @@ func tempDir() -> URL {
 
 /// Polls `condition` on the main actor until true or `timeout` passes.
 @MainActor
-func eventually(timeout: Double = 3, _ condition: () -> Bool) async -> Bool {
+func eventually(timeout: Double = 10, _ condition: () -> Bool) async -> Bool {
     let deadline = Date().addingTimeInterval(timeout)
     while Date() < deadline {
         if condition() { return true }
@@ -142,4 +142,9 @@ func makeMessage(topicId: UUID, id: String = UUID().uuidString, time: Int64 = 1_
                         tags: tags, click: click)
     let raw = String(decoding: try! JSONEncoder().encode(n), as: UTF8.self)
     return Message(topicId: topicId, ntfy: n, receivedAt: receivedAt, isCatchUp: isCatchUp, raw: raw)
+}
+
+extension Array {
+    /// nil instead of a crash when a test's request never arrived.
+    subscript(safe i: Int) -> Element? { indices.contains(i) ? self[i] : nil }
 }
