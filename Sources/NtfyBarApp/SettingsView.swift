@@ -68,8 +68,9 @@ struct GeneralTab: View {
                                 .foregroundStyle(.secondary)
                             Button("Resume") { model.pause(until: nil) }
                         } else {
-                            Button("Pause 1 Hour") { model.pause(until: Date().addingTimeInterval(3600)) }
-                            Button("Pause Until Resumed") { model.pause(until: .distantFuture) }
+                            Button("15 Minutes") { model.pause(until: Date().addingTimeInterval(15 * 60)) }
+                            Button("1 Hour") { model.pause(until: Date().addingTimeInterval(3600)) }
+                            Button("Until Resumed") { model.pause(until: .distantFuture) }
                         }
                     }
                 }
@@ -77,9 +78,11 @@ struct GeneralTab: View {
             Section {
                 Toggle("Cap the priority of messages NtfyBar sends", isOn: configBinding(engine, \.quietHours.enabled))
                 HStack {
-                    TextField("From", text: $start).frame(width: 80).onSubmit(saveQuietHours)
-                    Text("to")
-                    TextField("Until", text: $end).frame(width: 80).onSubmit(saveQuietHours)
+                    Text("From")
+                    TextField("From", text: $start).labelsHidden().frame(width: 70).onSubmit(saveQuietHours)
+                    Text("until")
+                    TextField("Until", text: $end).labelsHidden().frame(width: 70).onSubmit(saveQuietHours)
+                    Spacer()
                     Button("Save", action: saveQuietHours).disabled(!validTimes)
                 }
                 Picker("Highest priority during quiet hours", selection: configBinding(engine, \.quietHours.maxPriority)) {

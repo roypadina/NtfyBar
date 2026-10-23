@@ -315,7 +315,7 @@ struct PopupView: View {
                 button(b, number: i < 3 ? i + 1 : nil).fixedSize()
             }
             if !overflow.isEmpty {
-                Menu("More") {
+                Menu("Other actions") {
                     ForEach(overflow) { b in Button(b.label) { perform(b) } }
                 }
                 .menuStyle(.button)
@@ -337,10 +337,15 @@ struct PopupView: View {
 
     @ViewBuilder
     private func button(_ b: PopupContent.Button, number: Int?) -> some View {
-        let label = state.flashed == b.id ? (b.id == "copy" ? "Copied ✓" : "Done ✓") : state.failed == b.id ? "Failed ✗" : b.label
-        let base = Button(label) { perform(b) }
+        let text = state.flashed == b.id ? (b.id == "copy" ? "Copied ✓" : "Done ✓") : state.failed == b.id ? "Failed ✗" : b.label
+        // Sender-defined buttons carry a glyph (↗ opens a link, ⇄ sends a request) and show their host on hover.
+        let glyph: String? = b.senderHost == nil ? nil : { if case .http = b.action { "arrow.left.arrow.right" } else { "arrow.up.right" } }()
+        let base = Button { perform(b) } label: {
+            if let glyph { Label(text, systemImage: glyph) } else { Text(text) }
+        }
             .buttonStyle(PopupButtonStyle(signal: b.style == .destructive ? Theme.critical : signal, prominent: b.style == .prominent))
-            .accessibilityLabel(b.label)
+            .help(b.senderHost.map { "From the message: \($0)" } ?? "")
+            .accessibilityLabel(b.senderHost.map { "\(b.label), link to \($0)" } ?? b.label)
         if b.style == .prominent {
             base.keyboardShortcut(.defaultAction)
         } else if let number {

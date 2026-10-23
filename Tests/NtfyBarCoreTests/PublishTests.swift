@@ -128,11 +128,14 @@ final class PublishTests {
                 return echoFirst ? [.delay(0.6), .status(200), .line(#"{"id":"echo1"}"#), .end]
                                  : [.status(200), .line(#"{"id":"echo1"}"#), .end]
             }
-            return [.status(200), .line(openLine(time: t0, topic: topic)), .delay(echoFirst ? 0.2 : 0.5),
+            // The echo goes out only once our POST reached the server: right away (beating the POST's
+            // delayed response), or 0.3 s later (after the response).
+            return [.status(200), .line(openLine(time: t0, topic: topic)),
+                    .until { StubProtocol.requests(publishHost).contains { $0.httpMethod == "POST" } },
+                    .delay(echoFirst ? 0 : 0.3),
                     .line(ntfyLine(id: "echo1", time: t0, topic: topic, title: "Re", message: "ack")),
                     .line(ntfyLine(id: "other", time: t0, topic: topic, title: "Re", message: "not ours"))]
         }
-        _ = publishHost
         let e = try engine()
         e.start()
         defer { e.stop() }
@@ -159,5 +162,100 @@ struct HTTPActionTests {
         #expect(get.httpMethod == "GET" && get.httpBody == nil)
         #expect(HTTPAction.request(for: NtfyAction(action: "http", label: "F", url: "file:///etc/passwd")) == nil)
         #expect(HTTPAction.request(for: NtfyAction(action: "view", label: "V", url: "https://example.com")) == nil)
+    }
+}
+
+@Suite("Review follow-ups")
+@MainActor
+final class ReviewFollowUpTests {
+    let host = uniqueHost()
+    let topic = "ntfybar-\(UUID().uuidString.prefix(10).lowercased())"
+    let topicId = UUID()
+
+    @Test func watchdogLimitIsCapped() {
+        #expect(NtfyStream.watchdogLimit(keepaliveTimeout: 90, observedGap: 45) == 90)
+        #expect(NtfyStream.watchdogLimit(keepaliveTimeout: 90, observedGap: 120) == 240)
+        #expect(NtfyStream.watchdogLimit(keepaliveTimeout: 90, observedGap: 20 * 60) == 300, "one long sleep can't stretch it forever")
+    }
+
+    @Test func randomTopicIsLongAndValid() {
+        let names = (0..<50).map { _ in TopicConfig.randomName() }
+        #expect(names.allSatisfy { $0.range(of: #"^[-_A-Za-z0-9]{16,64}$"#, options: .regularExpression) != nil && TopicConfig.isValidTopicName($0) })
+        #expect(Set(names).count == 50)
+        #expect(names[0].count == "ntfybar-".count + 22)
+    }
+
+    @Test func quietHoursTimeField() {
+        #expect(QuietHours.isValidTime("20:00") && QuietHours.isValidTime("9:00") && QuietHours.isValidTime("00:00"))
+        #expect(!QuietHours.isValidTime("25:00") && !QuietHours.isValidTime("0900") && !QuietHours.isValidTime("9:60") && !QuietHours.isValidTime(""))
+    }
+
+    @Test func pathologicalRegexReturnsFast() throws {
+        let text = String(repeating: "a", count: 8000) + "b"  // within the 8 KB that is searched
+        let start = Date()
+        #expect(throws: SafeRegex.Failure.tooSlow) { try SafeRegex.matches("(a+)+$", in: text) }
+        #expect(Date().timeIntervalSince(start) < 1)
+        #expect(try SafeRegex.matches("^Backup (OK|FAILED)$", in: "Backup FAILED"))
+        #expect(try !SafeRegex.matches("x", in: ""))
+        #expect(throws: SafeRegex.Failure.invalidPattern) { try SafeRegex.matches("([", in: "x") }
+        // Through a rule: too slow = no match, never a hang.
+        var c = Config()
+        c.topics = [TopicConfig(id: topicId, serverId: c.servers[0].id, topic: topic, label: "T")]
+        let rule = Rule(name: "redos", conditions: [RuleStep("builtin.messageRegex", ["pattern": .string("(a+)+$")])],
+                        actions: [RuleStep("builtin.copy")])
+        let m = makeMessage(topicId: topicId, body: text)
+        let t2 = Date()
+        #expect(RuleEngine(rules: [rule]).evaluate(m, topic: c.topics[0], config: c).effects.isEmpty)
+        #expect(Date().timeIntervalSince(t2) < 1)
+    }
+
+    @Test func shortcutInputFileIsPrivateAndRemoved() async throws {
+        let script = tempDir().appendingPathComponent("fake-shortcuts")
+        try Data("#!/bin/sh\nstat -f %Lp \"$4\"; echo \"$4\"\n".utf8).write(to: script)
+        try FileManager.default.setAttributes([.posixPermissions: 0o700], ofItemAtPath: script.path)
+        let r = await CommandRunner.runShortcut(name: "x", message: makeMessage(topicId: topicId, body: "secret"), executable: script.path)
+        let lines = r.stdout.split(separator: "\n").map(String.init)
+        #expect(lines.first == "600")
+        #expect(lines.count == 2 && !FileManager.default.fileExists(atPath: lines[1]))
+    }
+
+    @Test func maxSizedEnvironmentStillSpawns() async {
+        let big = String(repeating: "x", count: 100_000)
+        var t = TopicConfig(serverId: UUID(), topic: topic, label: big)
+        t.id = topicId
+        let n = NtfyMessage(id: "big", time: 1, topic: topic, title: big, message: big, tags: [big], click: big)
+        let m = Message(topicId: topicId, ntfy: n, receivedAt: Date(), isCatchUp: false, raw: big)
+        let r = await CommandRunner.run(CommandSettings(command: "printf %s \"${#NTFY_MESSAGE}\""), message: m, topic: t)
+        #expect(r.succeeded, "\(r.stderr)")
+        #expect(r.stdout == "65536")
+    }
+
+    @Test func pauseKeepsCopyAndPublishOnly() {
+        var c = Config()
+        c.topics = [TopicConfig(id: topicId, serverId: c.servers[0].id, topic: topic, label: "T")]
+        c.pausedUntil = .distantFuture
+        let rule = Rule(name: "all", conditions: [RuleStep("builtin.priority", ["value": .number(1)])], actions: [
+            RuleStep("builtin.copy"), RuleStep("builtin.publish", ["topicId": .string(topicId.uuidString), "message": .string("x")]),
+            RuleStep("builtin.openURL", ["template": .string("https://example.com")]), RuleStep("builtin.runShortcut", ["name": .string("S")]),
+            RuleStep("builtin.runCommand", ["command": .string("true")]), RuleStep("builtin.playSound", ["name": .string("Glass")]),
+            RuleStep("builtin.popup")])
+        let effects = Dispatcher(rules: RuleEngine(rules: [rule])).handle(makeMessage(topicId: topicId), config: c, now: Date())
+        #expect(effects.count == 2)
+        #expect(effects.contains(.copy("hello")))
+        #expect(effects.contains { if case .publish = $0 { true } else { false } })
+    }
+
+    @Test func loopGuardForgetsAfterThePostAndStaysBounded() async throws {
+        StubProtocol.register(host) { req, _ in
+            req.httpMethod == "POST" ? [.status(200), .line("{\"id\":\"p\(UUID().uuidString.prefix(8))\"}"), .end] : [.status(200)]
+        }
+        let store = ConfigStore(directory: tempDir())
+        var c = Config()
+        c.servers = [ServerConfig(url: "https://\(host)")]
+        c.topics = [TopicConfig(id: topicId, serverId: c.servers[0].id, topic: topic, label: "T")]
+        try store.saveConfig(c)
+        let e = try Engine(store: store, session: StubProtocol.session())
+        for i in 0..<1100 { try await e.publish(PublishRequest(topicId: topicId, message: "m\(i)"), rateKey: nil) }
+        #expect(e.ownEchoCount <= 1000, "\(e.ownEchoCount)")
     }
 }

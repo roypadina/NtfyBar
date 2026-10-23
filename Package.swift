@@ -19,7 +19,9 @@ let package = Package(
     ],
     targets: [
         .target(
-            name: "NtfyBarCore"
+            name: "NtfyBarCore",
+            // ICU regex with a time limit (SafeRegex); ships with macOS.
+            linkerSettings: [.linkedLibrary("icucore")]
         ),
         .executableTarget(
             name: "NtfyBarApp",

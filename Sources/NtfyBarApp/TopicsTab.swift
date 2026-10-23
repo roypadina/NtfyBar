@@ -93,9 +93,9 @@ struct TopicEditor: View {
                     }
                 }
                 HStack {
-                    TextField("Topic", text: $draft.topic, prompt: Text("ntfybar-9f3a1c7b2e"))
+                    TextField("Topic", text: $draft.topic, prompt: Text("e.g. ntfybar-k3Xq9Lw2…"))
                         .font(.system(.body, design: .monospaced))
-                    Button("Random") { draft.topic = "ntfybar-" + randomHex(10) }
+                    Button("Random") { draft.topic = TopicConfig.randomName() }
                 }
                 Toggle("Enabled", isOn: $draft.enabled)
             } header: {
@@ -211,8 +211,4 @@ struct TopicEditor: View {
             }
         }
     }
-}
-
-func randomHex(_ bytes: Int) -> String {
-    (0..<bytes).map { _ in String(format: "%02x", UInt8.random(in: 0...255)) }.joined()
 }

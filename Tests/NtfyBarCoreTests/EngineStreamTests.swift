@@ -166,18 +166,24 @@ final class EngineStreamTests {
     }
 
     @Test func backoffResetsAfterEachOpenEvent() async throws {
-        StubProtocol.register(host) { [topic] _, _ in [.status(200), .line(openLine(time: 1, topic: topic)), .end] }
-        let store = ConfigStore(directory: tempDir())
-        var c = Config()
-        c.servers = [ServerConfig(url: "https://\(host)")]
-        c.topics = [TopicConfig(id: topicId, serverId: c.servers[0].id, topic: topic, label: "Demo")]
-        try store.saveConfig(c)
-        let e = try Engine(store: store, session: StubProtocol.session(),
-                           timing: .init(keepaliveTimeout: 90, watchdogInterval: 0.05, backoff: Backoff(base: 0.3, cap: 10)))
-        e.start()
-        defer { e.stop() }
-        // With a reset after every `open`: gaps of ~0.3 s. Without: 0.3, 0.6, 1.2 … → 4th request after 2.1 s.
-        #expect(await eventually(timeout: 1.6) { StubProtocol.requests(self.host).count >= 4 })
+        StubProtocol.register(host) { [topic] _, attempt in
+            // Connections 0–2 open then end (backoff must reset); 3–4 fail before `open` (it must grow).
+            attempt < 3 ? [.status(200), .line(openLine(time: 1, topic: topic)), .end] : [.status(500), .end]
+        }
+        var delays: [Double] = []
+        let base = 0.05
+        let stream = NtfyStream(serverId: UUID(), baseURL: URL(string: "https://\(host)")!, authHeader: nil, topics: [topic: topicId],
+                                lastEventTime: nil, session: StubProtocol.session(),
+                                timing: .init(keepaliveTimeout: 90, watchdogInterval: 1, backoff: Backoff(base: base, cap: 10)),
+                                now: { Date(timeIntervalSince1970: 0) }, jitter: { 0 },
+                                onMessage: { _ in }, onState: { state in
+                                    if case let .reconnecting(at) = state { delays.append(at.timeIntervalSince1970) }
+                                })
+        stream.start()
+        defer { stream.stop() }
+        #expect(await eventually(timeout: 5) { delays.count >= 5 })
+        let expected = [base, base, base, base * 2, base * 4]
+        #expect(zip(delays, expected).allSatisfy { abs($0 - $1) < 1e-6 }, "\(delays)")
     }
 
     @Test func steadyMessagesKeepTheWatchdogQuiet() async throws {
@@ -195,13 +201,16 @@ final class EngineStreamTests {
     }
 
     @Test func failedInsertDoesNotAdvanceTheCursor() async throws {
+        let closed = Flag()
         StubProtocol.register(host) { [topic, t0] _, _ in
-            [.status(200), .line(openLine(time: t0, topic: topic)), .delay(0.4), .line(ntfyLine(id: "lost", time: t0, topic: topic))]
+            [.status(200), .line(openLine(time: t0, topic: topic)), .until { closed.value },
+             .line(ntfyLine(id: "lost", time: t0, topic: topic))]
         }
         let e = try engine()
         e.start()
         #expect(await eventually { e.streamStates.values.first == .connected })
         e.history.close()
+        closed.set()
         try await Task.sleep(for: .milliseconds(600))
         e.stop()
         #expect(notified.isEmpty)

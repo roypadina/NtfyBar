@@ -59,6 +59,8 @@ struct HistoryStoreTests {
         #expect(h.search("100%", limit: 10).map(\.ntfy.id) == ["2"])
         #expect(h.search("%", limit: 10).map(\.ntfy.id) == ["2"], "% is literal")
         #expect(h.search("_", limit: 10).isEmpty, "_ is literal")
+        h.insert(makeMessage(topicId: a, id: "4", title: "it's O'Brien", body: "z"))
+        #expect(h.search("'", limit: 10).map(\.ntfy.id) == ["4"], "quotes are bound, not spliced")
     }
 
     @Test func unreadAndMarkRead() throws {

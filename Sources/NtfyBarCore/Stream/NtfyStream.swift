@@ -107,6 +107,11 @@ public final class NtfyStream {
         start()
     }
 
+    /// Adapts to servers with slower keepalives, but never beyond 5 minutes.
+    nonisolated static func watchdogLimit(keepaliveTimeout: Double, observedGap: Double) -> Double {
+        min(300, max(keepaliveTimeout, 2 * observedGap))
+    }
+
     var isTerminal: Bool {
         switch state {
         case .authFailed, .redirected: true
@@ -162,6 +167,8 @@ public final class NtfyStream {
         if let authHeader { request.setValue(authHeader, forHTTPHeaderField: "Authorization") }
 
         lastActivity = now()
+        lastKeepalive = nil
+        keepaliveGap = 0
         let reader = Task { [weak self] () -> Outcome in
             guard let self else { return .ended }
             return try await self.read(request)
@@ -170,7 +177,7 @@ public final class NtfyStream {
             while !Task.isCancelled {
                 try? await Task.sleep(for: .seconds(timing.watchdogInterval))
                 guard let self, !Task.isCancelled else { return }
-                let limit = max(timing.keepaliveTimeout, 2 * self.keepaliveGap)
+                let limit = NtfyStream.watchdogLimit(keepaliveTimeout: timing.keepaliveTimeout, observedGap: self.keepaliveGap)
                 if self.now().timeIntervalSince(self.lastActivity) > limit {
                     Log.stream.info("nothing received for \(Int(limit), privacy: .public) s; reconnecting")
                     reader.cancel()

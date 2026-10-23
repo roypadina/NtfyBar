@@ -12,6 +12,8 @@ final class StubProtocol: URLProtocol, @unchecked Sendable {
         case delay(Double)
         case end
         case fail
+        /// Waits (up to 5 s) until the condition holds, e.g. "the POST has arrived".
+        case until(@Sendable () -> Bool)
     }
 
     typealias Handler = @Sendable (URLRequest, Int) -> [Step]
@@ -75,6 +77,12 @@ final class StubProtocol: URLProtocol, @unchecked Sendable {
                 case let .delay(seconds):
                     let until = Date().addingTimeInterval(seconds)
                     while Date() < until {
+                        if stopped.withLock({ isStopped }) { return }
+                        Thread.sleep(forTimeInterval: 0.01)
+                    }
+                case let .until(condition):
+                    let deadline = Date().addingTimeInterval(5)
+                    while !condition() && Date() < deadline {
                         if stopped.withLock({ isStopped }) { return }
                         Thread.sleep(forTimeInterval: 0.01)
                     }

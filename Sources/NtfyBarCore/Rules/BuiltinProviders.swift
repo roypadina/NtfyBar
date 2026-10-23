@@ -130,7 +130,9 @@ enum BuiltinProviders {
         }
         action("builtin.runShortcut", "Run Shortcut", "Run a macOS Shortcut with the message as input.",
                [ParamSpec("name", "Shortcut name")]) { ctx, p in
-            ActionOutput([.runShortcut(name: try p.required("name"), ctx.message)])
+            let name = try p.required("name")
+            guard !name.hasPrefix("-") else { throw ProviderError.badParams("a Shortcut name can't start with -") }
+            return ActionOutput([.runShortcut(name: name, ctx.message)])
         }
         action("builtin.playSound", "Play sound", "Play a system sound (e.g. Glass, Basso, Ping).",
                [ParamSpec("name", "Sound name", placeholder: "Glass")]) { _, p in
@@ -142,8 +144,12 @@ enum BuiltinProviders {
     }
 
     static func matches(_ text: String, _ pattern: String) throws -> Bool {
-        let re: NSRegularExpression
-        do { re = try NSRegularExpression(pattern: pattern) } catch { throw ProviderError.badParams("invalid regex") }
-        return re.firstMatch(in: text, range: NSRange(text.startIndex..., in: text)) != nil
+        do {
+            return try SafeRegex.matches(pattern, in: text)
+        } catch SafeRegex.Failure.tooSlow {
+            throw ProviderError.failed("regex took too long on this message (skipped)")
+        } catch {
+            throw ProviderError.badParams("invalid regex")
+        }
     }
 }

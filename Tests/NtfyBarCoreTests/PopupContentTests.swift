@@ -32,7 +32,12 @@ struct PopupContentTests {
 
     @Test func exactlyOneProminentButton() {
         func prominent(_ c: PopupContent) -> [String] { c.buttons.filter { $0.style == .prominent }.map(\.id) }
-        #expect(prominent(.forMessage(request(actions: [NtfyAction(action: "view", label: "V", url: "https://example.com")], click: "https://example.com"))) == ["ntfy-0"])
+        #expect(prominent(.forMessage(request(actions: [NtfyAction(action: "view", label: "V", url: "https://example.com")], click: "https://example.com"))) == ["open"])
+        // A sender-defined action is never the Return button, even as the only action.
+        let http = NtfyAction(action: "http", label: "Dismiss", url: "http://192.168.1.1/reboot")
+        let onlyHttp = PopupContent.forMessage(request(actions: [http]))
+        #expect(prominent(onlyHttp) == ["dismiss"])
+        #expect(onlyHttp.buttons.first?.senderHost == "192.168.1.1", "shown with its host")
         #expect(prominent(.forMessage(request(click: "https://example.com"))) == ["open"])
         #expect(prominent(.forMessage(request())) == ["dismiss"])
         var s = PopupSettings()

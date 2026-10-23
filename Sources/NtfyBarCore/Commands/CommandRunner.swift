@@ -51,6 +51,7 @@ public enum CommandRunner {
         do {
             try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true, attributes: [.posixPermissions: 0o700])
             try Data(m.body.utf8).write(to: file)
+            try FileManager.default.setAttributes([.posixPermissions: 0o600], ofItemAtPath: file.path)
         } catch {
             return CommandResult(exitCode: -1, timedOut: false, stdout: "", stderr: error.localizedDescription)
         }
