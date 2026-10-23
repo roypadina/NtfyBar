@@ -301,10 +301,14 @@ struct PopupView: View {
     private var buttons: some View {
         let dismiss = c.buttons.first { $0.action == .dismiss }
         let others = c.buttons.filter { $0.action != .dismiss }
-        // All buttons at full width if they fit; otherwise the first two plus a "More" menu.
+        // The highlighted (Return) button always stays visible, first; the rest fold into a menu
+        // as the width requires.
+        let primary = others.filter { $0.style == .prominent }
+        let rest = others.filter { $0.style != .prominent }
         return ViewThatFits(in: .horizontal) {
-            buttonRow(shown: others, overflow: [], dismiss: dismiss)
-            buttonRow(shown: Array(others.prefix(2)), overflow: Array(others.dropFirst(2)), dismiss: dismiss)
+            buttonRow(shown: primary + rest, overflow: [], dismiss: dismiss)
+            buttonRow(shown: primary + rest.prefix(1), overflow: Array(rest.dropFirst(1)), dismiss: dismiss)
+            buttonRow(shown: primary, overflow: rest, dismiss: dismiss)
             buttonRow(shown: [], overflow: others, dismiss: dismiss)
         }
     }
@@ -394,7 +398,7 @@ struct PopupButtonStyle: ButtonStyle {
             cfg.label
                 .font(Theme.button)
                 .lineLimit(1)
-                .padding(.horizontal, 12)
+                .padding(.horizontal, 10)
                 .frame(height: 28)
                 .foregroundStyle(prominent ? AnyShapeStyle(Theme.onSignal) : AnyShapeStyle(.primary))
                 .background(

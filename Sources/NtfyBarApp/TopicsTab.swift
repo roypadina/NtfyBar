@@ -134,7 +134,7 @@ struct TopicEditor: View {
                         get: { draft.command?.timeoutSec ?? 30 }, set: { draft.command?.timeoutSec = $0 }), in: 1...600)
                     Toggle("Notify me when it fails", isOn: Binding(
                         get: { draft.command?.notifyOnFailure ?? true }, set: { draft.command?.notifyOnFailure = $0 }))
-                    Text("Runs with /bin/zsh in your home folder. The message arrives in $NTFY_MESSAGE, $NTFY_TITLE, $NTFY_PRIORITY, $NTFY_TAGS, $NTFY_CLICK, $NTFY_ID, $NTFY_TIME, $NTFY_JSON and on stdin — never pasted into the command itself.")
+                    Text("Runs with /bin/zsh in your home folder. The message arrives in $NTFY_MESSAGE, $NTFY_TITLE, $NTFY_PRIORITY, $NTFY_TAGS, $NTFY_CLICK, $NTFY_ID, $NTFY_TIME, $NTFY_JSON and on stdin — never pasted into the command itself. Quote them (\"$NTFY_TITLE\") and don't hand them to eval or osascript -e.")
                         .font(.caption).foregroundStyle(.secondary)
                 }
                 Toggle("Also run all this for messages missed while away", isOn: $draft.processMissed)
