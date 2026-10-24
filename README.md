@@ -55,7 +55,7 @@ a copy to the clipboard, a shell command, or rules and plugins.
 brew install --cask roypadina/tap/ntfybar
 ```
 
-NtfyBar is ad-hoc signed (not notarized), so on first launch macOS may block it. Right-click
+NtfyBar is signed with a self-signed identity (not notarized), so on first launch macOS may block it. Right-click
 NtfyBar in `/Applications` and choose **Open**, or run once:
 
 ```sh
@@ -180,7 +180,7 @@ NtfyBar needs no Accessibility, Full Disk or other special access.
 
 ## Limitations
 
-- Not notarized (ad-hoc signed): see the first-launch note under [Install](#homebrew).
+- Not notarized (self-signed): see the first-launch note under [Install](#homebrew).
 - Attachments are shown as a link; NtfyBar doesn't download or preview them.
 - ntfy's Android `broadcast` actions don't apply on a Mac and are hidden.
 - A command that starts background processes: on timeout NtfyBar stops the shell, not its children.

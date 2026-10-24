@@ -4,17 +4,18 @@ set -euo pipefail
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 APP_NAME="NtfyBar"
 BUNDLE_ID="com.padina.ntfybar"
-VERSION="1.3.0"
-BUILD_NUMBER="6"
+VERSION="1.3.1"
+BUILD_NUMBER="7"
 BUILD_CONFIG="release"
 DIST_DIR="$ROOT_DIR/dist"
 APP_DIR="$DIST_DIR/$APP_NAME.app"
 CONTENTS_DIR="$APP_DIR/Contents"
 MACOS_DIR="$CONTENTS_DIR/MacOS"
 RESOURCES_DIR="$CONTENTS_DIR/Resources"
-SIGNING_IDENTITY="${CODE_SIGN_IDENTITY:-}"
-# RELEASE=1: ad hoc signed (no local certificate name ships) and zipped into dist/NtfyBar.zip for
-# GitHub Releases and the Homebrew cask. Dev builds use the first local code-signing identity.
+SIGNING_IDENTITY="${NTFYBAR_SIGN_IDENTITY:-${CODE_SIGN_IDENTITY:-}}"
+# RELEASE=1: signed with the maintainer's stable identity when it is in the keychain (so macOS
+# permissions survive updates), else ad hoc; zipped into dist/NtfyBar.zip for GitHub Releases and
+# the Homebrew cask. Dev builds use that identity too, else the first local code-signing identity.
 RELEASE="${RELEASE:-}"
 
 cd "$ROOT_DIR"
@@ -74,7 +75,13 @@ chmod +x "$MACOS_DIR/$APP_NAME"
 # Drop the debug map (object-file paths from the build machine).
 strip -S -x "$MACOS_DIR/$APP_NAME"
 
+STABLE_ID="KeyLayoutSwitcher Dev"
+if [[ -z "$SIGNING_IDENTITY" ]] && security find-identity -v -p codesigning 2>/dev/null | grep -q "\"$STABLE_ID\""; then
+    SIGNING_IDENTITY="$STABLE_ID"
+fi
+
 if [[ -n "$RELEASE" && -z "$SIGNING_IDENTITY" ]]; then
+    echo "warning: stable signing identity missing; ad hoc release build" >&2
     SIGNING_IDENTITY="-"
 fi
 

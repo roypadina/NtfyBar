@@ -4,6 +4,11 @@ All notable changes to NtfyBar are documented here.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project
 uses [Semantic Versioning](https://semver.org/).
 
+## [1.3.1] - 2026-10-25
+
+### Changed
+- Releases are now signed with a stable identity, so permissions survive future updates. After this one update you may need to re-allow notifications once.
+
 ## [1.3.0] - 2026-10-25
 
 ### Added
