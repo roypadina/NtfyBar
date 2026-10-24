@@ -2,7 +2,7 @@ import AppKit
 import NtfyBarCore
 import SwiftUI
 
-/// `--render-settings|--render-popup|--render-history <png>`: draws a view with demo data, off
+/// `--render-settings|--render-popup|--render-history|--render-publish <png>`: draws a view with demo data, off
 /// screen, for the README and wiki. Uses a throwaway config dir, never the real one, and never
 /// connects anywhere. PNGs keep only IHDR/IDAT/IEND (no colour-profile name, no metadata).
 @MainActor
@@ -28,6 +28,10 @@ enum Renderer {
                 .padding(24))
         case "--render-history":
             view = AnyView(HistoryView(model: model, engine: model.engine).frame(width: 640, height: 460))
+        case "--render-publish":
+            view = AnyView(PublishView(model: model, engine: model.engine, message: "Build logs from tonight's run.",
+                                       files: ["build-482.log", "screenshot.png"].map { URL(fileURLWithPath: "/tmp/\($0)") })
+                .frame(width: 500, height: 560))
         default:
             let tab = ProcessInfo.processInfo.environment["NTFYBAR_RENDER_TAB"] ?? "topics"
             if tab == "consent", let pkg = model.engine.pluginPackages.first(where: { $0.manifest != nil }) {
@@ -97,6 +101,8 @@ enum DemoData {
         h.popup.level = .overFullScreen
         let k = TopicConfig(id: backups, serverId: c.servers[0].id, topic: "ntfybar-7b3e95f0c1", label: "Backups")
         c.topics = [b, h, k]
+        c.publish.title = "Demo Mac"  // never the real computer name in a screenshot
+        c.publish.lastTopicId = home
         try store.saveConfig(c)
         try store.saveRules(RulesFile(rules: [
             Rule(name: "Urgent home alerts stay on screen", topicIds: [home],

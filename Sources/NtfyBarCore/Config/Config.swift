@@ -295,6 +295,29 @@ public struct QuietHours: Codable, Equatable, Sendable {
     }
 }
 
+/// Menu "Send Clipboard" and the Publish window. The sender tag goes first in every message's tags.
+public struct PublishSettings: Codable, Equatable, Sendable {
+    /// The Mac's computer name (System Settings › General › Sharing), read once.
+    public static let computerName = Host.current().localizedName ?? "Mac"
+
+    public var deviceTag = "ntfybar-mac"
+    public var title = PublishSettings.computerName
+    /// Topic of the last send: "Send Clipboard to …" goes there, the Publish window preselects it.
+    public var lastTopicId: UUID? = nil
+
+    public init() {}
+
+    private enum CodingKeys: String, CodingKey { case deviceTag, title, lastTopicId }
+
+    public init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        let d = PublishSettings()
+        deviceTag = c.value(.deviceTag, d.deviceTag)
+        title = c.value(.title, d.title)
+        lastTopicId = c.value(.lastTopicId, nil)
+    }
+}
+
 public struct Config: Codable, Equatable, Sendable {
     public var servers: [ServerConfig] = [ServerConfig(url: "https://ntfy.sh")]
     public var topics: [TopicConfig] = []
@@ -304,11 +327,12 @@ public struct Config: Codable, Equatable, Sendable {
     public var didRegisterLoginItem = false
     /// Notifications paused until this date; `Date.distantFuture` = until resumed.
     public var pausedUntil: Date? = nil
+    public var publish = PublishSettings()
 
     public init() {}
 
     private enum CodingKeys: String, CodingKey {
-        case servers, topics, plugins, quietHours, launchAtLogin, didRegisterLoginItem, pausedUntil
+        case servers, topics, plugins, quietHours, launchAtLogin, didRegisterLoginItem, pausedUntil, publish
     }
 
     public init(from decoder: Decoder) throws {
@@ -321,6 +345,7 @@ public struct Config: Codable, Equatable, Sendable {
         launchAtLogin = c.value(.launchAtLogin, true)
         didRegisterLoginItem = c.value(.didRegisterLoginItem, false)
         pausedUntil = c.value(.pausedUntil, nil)
+        publish = c.value(.publish, PublishSettings())
     }
 
     public func server(_ id: UUID) -> ServerConfig? { servers.first { $0.id == id } }

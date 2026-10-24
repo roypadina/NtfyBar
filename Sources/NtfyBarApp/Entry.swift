@@ -6,7 +6,7 @@ import Foundation
 @main
 enum Entry {
     static let usage = """
-        usage: NtfyBar [--render-settings <png> | --render-popup <png> | --render-history <png>]
+        usage: NtfyBar [--render-settings <png> | --render-popup <png> | --render-history <png> | --render-publish <png>]
         """
 
     static func main() {
@@ -14,7 +14,7 @@ enum Entry {
         if let flag = args.first(where: { $0.hasPrefix("--") }) {
             let path = args.drop(while: { $0 != flag }).dropFirst().first
             switch flag {
-            case "--render-settings", "--render-popup", "--render-history":
+            case "--render-settings", "--render-popup", "--render-history", "--render-publish":
                 guard let path else { fail("missing output path for \(flag)") }
                 exit(MainActor.assumeIsolated { Renderer.run(flag, to: URL(fileURLWithPath: path)) } ? 0 : 1)
             case "--help":
