@@ -88,6 +88,8 @@ Move `dist/NtfyBar.app` to `/Applications` and open it from there. More in the
    curl -H "Title: Backup done" -H "Tags: white_check_mark" -d "3.1 GB, no errors" ntfy.sh/<your topic>
    ```
 
+Settings live in `~/Library/Application Support/NtfyBar/config.json` and `rules.json`; edits to them (by hand, a script or an agent) apply within 2 seconds, no restart — keep each existing topic's `id`.
+
 The menu shows the connection state, your last messages (unread count next to the bell), **Mark
 All Read**, **Pause Notifications** and **History…**.
 
@@ -120,7 +122,7 @@ controls that text. Commands time out after 30 s by default and run one at a tim
 
 ### Rules and plugins
 
-**Settings › Rules** — every enabled rule whose conditions match runs, top to bottom. A rule can
+**Settings › Rules** (or `rules.json`) — every enabled rule whose conditions match runs, top to bottom. A rule can
 be limited to some topics and can skip the topic's own notification/popup. **Settings › Plugins**
 adds conditions and actions from plugins; see [Plugins](#plugins).
 

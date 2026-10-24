@@ -6,6 +6,15 @@ uses [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [1.1.1] - 2026-10-24
+
+### Added
+- Edits to `config.json` and `rules.json` made outside the app (an editor, a script, an agent) apply within 2 seconds, no restart. A file that isn't valid JSON is ignored and the running settings stay.
+- **Remove Topic…**, **Remove Server…** and **Remove Rule…** buttons in their editors (the − under each list still works).
+
+### Changed
+- The Settings window is bigger and can be resized.
+
 ## [1.1.0] - 2026-10-23
 
 ### Added
