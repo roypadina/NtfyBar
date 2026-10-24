@@ -127,6 +127,9 @@ struct TopicEditor: View {
                     TextField("Sound for high", text: soundBinding("4"), prompt: Text("none"))
                 }
                 Toggle("Copy the message to the clipboard", isOn: $draft.copyToClipboard)
+                Toggle("Download attachments to ~/Downloads/NtfyBar", isOn: $draft.downloadAttachments)
+                Toggle("Copy the downloaded attachment to the clipboard", isOn: $draft.copyAttachment)
+                    .disabled(!draft.downloadAttachments)
                 Toggle("Run a command", isOn: $commandOn)
                 if commandOn {
                     TextField("Command", text: commandBinding, prompt: Text("say \"$NTFY_TITLE\""), axis: .vertical)

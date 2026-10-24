@@ -12,6 +12,8 @@ public enum Effect: Equatable, Sendable {
     /// Flood guard: one banner when a burst starts; the rest wait in History.
     case floodNotification(topicId: UUID, label: String)
     case copy(String)
+    /// Save the attachment to ~/Downloads/NtfyBar; `copyAfterSec` = copy the file to the clipboard that long after the text copy.
+    case attachment(Message, copyAfterSec: Double?)
     case playSound(String)
     case runCommand(CommandSettings, Message, label: String)
     case runShortcut(name: String, Message)
@@ -22,7 +24,7 @@ public enum Effect: Equatable, Sendable {
     var interrupts: Bool {
         switch self {
         case .notify, .popup, .pluginPopup, .summaryPopup, .summaryNotification, .floodNotification, .playSound, .runCommand, .runShortcut, .openURL: true
-        case .copy, .publish: false
+        case .copy, .attachment, .publish: false
         }
     }
 }

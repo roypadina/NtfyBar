@@ -170,6 +170,8 @@ public struct TopicConfig: Codable, Equatable, Identifiable, Sendable {
     public var notify = true
     public var popup = PopupSettings()
     public var copyToClipboard = false
+    public var downloadAttachments = false
+    public var copyAttachment = false
     public var command: CommandSettings? = nil
     public var retention = Retention()
     public var processMissed = false
@@ -183,7 +185,7 @@ public struct TopicConfig: Codable, Equatable, Identifiable, Sendable {
     }
 
     private enum CodingKeys: String, CodingKey {
-        case id, serverId, topic, label, enabled, notify, popup, copyToClipboard, command, retention, processMissed, soundOverride
+        case id, serverId, topic, label, enabled, notify, popup, copyToClipboard, downloadAttachments, copyAttachment, command, retention, processMissed, soundOverride
     }
 
     public init(from decoder: Decoder) throws {
@@ -196,6 +198,8 @@ public struct TopicConfig: Codable, Equatable, Identifiable, Sendable {
         notify = c.value(.notify, true)
         popup = c.value(.popup, PopupSettings())
         copyToClipboard = c.value(.copyToClipboard, false)
+        downloadAttachments = c.value(.downloadAttachments, false)
+        copyAttachment = c.value(.copyAttachment, false)
         command = c.value(.command, nil)
         retention = c.value(.retention, Retention())
         processMissed = c.value(.processMissed, false)
