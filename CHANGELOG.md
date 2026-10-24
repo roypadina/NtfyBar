@@ -4,7 +4,7 @@ All notable changes to NtfyBar are documented here.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project
 uses [Semantic Versioning](https://semver.org/).
 
-## [Unreleased]
+## [1.2.0] - 2026-10-25
 
 ### Added
 - Attachments: every popup with one gets **Copy file**, **Download** and **Open folder** buttons (saved to `~/Downloads/NtfyBar`). Two new per-topic options, **Download attachments** and **Copy the downloaded attachment**, do it on arrival; with the text copy on too, the text is copied first and the file a second later. The server's sign-in is sent only to that server, never to external attachment links; automatic downloads skip files over 100 MB.
