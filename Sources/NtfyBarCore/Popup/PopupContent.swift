@@ -28,6 +28,7 @@ public struct PopupContent: Equatable, Sendable {
             case http(NtfyAction)
             case copy(String)
             case attachment(copy: Bool)
+            case attachmentFolder
             case dismiss
             case showHistory
             case plugin(String)  // button id sent to the plugin's onPopupAction
@@ -133,6 +134,7 @@ public struct PopupContent: Equatable, Sendable {
         if m.ntfy.attachment != nil, SafeOpen.url(m.ntfy.attachment?.url) != nil {
             buttons.append(Button(id: "attach-copy", label: "Copy file", action: .attachment(copy: true)))
             buttons.append(Button(id: "attach-download", label: "Download", action: .attachment(copy: false)))
+            buttons.append(Button(id: "attach-folder", label: "Open folder", action: .attachmentFolder))
         }
         if s.showOpen, let url = SafeOpen.url(m.ntfy.click) { buttons.append(Button(id: "open", label: "Open", action: .open(url))) }
         // Exactly one prominent (Return) button: Open, else Dismiss — never a sender-defined action,

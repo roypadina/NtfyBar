@@ -12,6 +12,14 @@ public enum AttachmentFile {
         FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent("Downloads/NtfyBar", isDirectory: true)
     }
 
+    public enum FolderAction: Equatable, Sendable { case reveal(URL), openFolder(URL) }
+
+    /// Open folder: select the saved file when it still exists, else show the download folder.
+    public static func folderAction(saved: URL?, in dir: URL = directory, exists: (URL) -> Bool = { FileManager.default.fileExists(atPath: $0.path) }) -> FolderAction {
+        if let saved, exists(saved) { return .reveal(saved) }
+        return .openFolder(dir)
+    }
+
     public static func autoDownloadAllowed(size: Int64?) -> Bool { (size ?? 0) <= maxAutoBytes }
 
     /// Authorization header only when scheme + host + port equal the server's base URL.

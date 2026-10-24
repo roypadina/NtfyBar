@@ -53,6 +53,15 @@ struct AttachmentTests {
         #expect(AttachmentFile.sanitizedName(String(repeating: "a", count: 500)).count <= 120)
     }
 
+    @Test func openFolderRevealsSavedFileElseFolder() {
+        let dir = URL(fileURLWithPath: "/tmp/dl/NtfyBar")
+        let file = dir.appendingPathComponent("a.jpg")
+        #expect(AttachmentFile.folderAction(saved: file, in: dir) { _ in true } == .reveal(file))
+        #expect(AttachmentFile.folderAction(saved: file, in: dir) { _ in false } == .openFolder(dir), "file was deleted")
+        #expect(AttachmentFile.folderAction(saved: nil, in: dir) { _ in true } == .openFolder(dir))
+        #expect(AttachmentFile.directory.path.hasSuffix("/Downloads/NtfyBar"))
+    }
+
     @Test func uniqueNames() {
         #expect(AttachmentFile.uniqueName("a.jpg") { _ in false } == "a.jpg")
         #expect(AttachmentFile.uniqueName("a.jpg") { $0 == "a.jpg" } == "a (2).jpg")
@@ -111,7 +120,7 @@ struct AttachmentTests {
         var m = makeMessage(topicId: t.id)
         m.ntfy.attachment = NtfyAttachment(name: "p.jpg", url: "https://x.example/p.jpg")
         let ids = PopupContent.forMessage(PopupRequest(message: m, label: "x", settings: t.popup)).buttons.map(\.id)
-        #expect(ids.contains("attach-copy") && ids.contains("attach-download"))
+        #expect(ids.contains("attach-copy") && ids.contains("attach-download") && ids.contains("attach-folder"))
         m.ntfy.attachment = NtfyAttachment(name: "p.jpg", url: "file:///etc/passwd")
         #expect(!PopupContent.forMessage(PopupRequest(message: m, label: "x", settings: t.popup)).buttons.map(\.id).contains("attach-copy"))
         m.ntfy.attachment = nil

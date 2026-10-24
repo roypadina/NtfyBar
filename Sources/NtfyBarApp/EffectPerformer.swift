@@ -141,6 +141,14 @@ final class EffectPerformer {
                     state.failed = button.id
                 }
             }
+        case .attachmentFolder:
+            let saved = content.topicId.flatMap { t in content.messageId.map { savedFiles["\(t.uuidString)/\($0)"] } } ?? nil
+            switch AttachmentFile.folderAction(saved: saved) {
+            case let .reveal(file): NSWorkspace.shared.activateFileViewerSelecting([file])
+            case let .openFolder(dir):
+                try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+                NSWorkspace.shared.open(dir)
+            }
         case .dismiss:
             markRead()
             PopupPanel.dismiss(state)
