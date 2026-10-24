@@ -28,7 +28,7 @@ a copy to the clipboard, a shell command, or rules and plugins.
 ## Features
 
 - **Topics on ntfy.sh or your own server** — several servers, with username/password or access-token sign-in. Live streaming with automatic reconnect; messages sent while your Mac was asleep or offline are fetched and summed up in one notification instead of a flood.
-- **Per topic, choose what happens:** macOS notification · NtfyBar popup · copy to clipboard · run your own shell command · any combination.
+- **Per topic, choose what happens:** macOS notification · NtfyBar popup · copy to clipboard · download attachments (and copy the file, e.g. a shared photo) · run your own shell command · any combination.
 - **Popups that don't get missed** — float above your windows (optionally above full-screen apps) without stealing focus, stack neatly, show priority as colour *and* icon *and* word, render markdown, and carry the message's own action buttons (open a link, send an HTTP request). Urgent ones stay until you dismiss them.
 - **Rules** — conditions (priority, title/message text or regex, tags, JSON, …) and actions (popup, copy, open a URL, run a command or Shortcut, publish a reply, play a sound, skip the topic defaults). Edit them in Settings or in `rules.json`.
 - **Plugins** — JavaScript conditions, actions and popups in a sandbox with permissions you approve one by one ([marketplace](https://github.com/roypadina/NtfyBar-Plugins)).

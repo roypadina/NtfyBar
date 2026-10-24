@@ -94,10 +94,21 @@ public final class Dispatcher {
             effects.append(.playSound(sound))
         }
         if topic.copyToClipboard { effects.append(.copy(m.body)) }
+        if let e = Self.attachmentEffect(m, topic: topic) { effects.append(e) }
         if let command = topic.command, !command.command.trimmingCharacters(in: .whitespaces).isEmpty {
             effects.append(.runCommand(command, m, label: topic.displayLabel))
         }
         return effects
+    }
+
+    /// Text goes first (above); the file is copied `copyGapSec` later when both are on.
+    static func attachmentEffect(_ m: Message, topic: TopicConfig) -> Effect? {
+        guard topic.downloadAttachments, let a = m.ntfy.attachment else { return nil }
+        guard AttachmentFile.autoDownloadAllowed(size: a.size) else {
+            Log.dispatch.info("attachment over 100 MB: not downloaded automatically")
+            return nil
+        }
+        return .attachment(m, copyAfterSec: topic.copyAttachment ? (topic.copyToClipboard ? AttachmentFile.copyGapSec : 0) : nil)
     }
 
     private static func isPopup(_ e: Effect) -> Bool {

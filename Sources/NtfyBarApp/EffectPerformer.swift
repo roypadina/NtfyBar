@@ -30,6 +30,17 @@ final class EffectPerformer {
                 showSummaryPopup(topicId: topicId, label: label, count: count)
             case let .copy(text):
                 copy(text)
+            case let .attachment(m, copyAfterSec):
+                let started = Date()
+                Task { @MainActor in
+                    do {
+                        let file = try await attachmentFile(m)
+                        guard let gap = copyAfterSec else { return }
+                        let wait = gap - Date().timeIntervalSince(started)
+                        if wait > 0 { try? await Task.sleep(for: .seconds(wait)) }
+                        copyFile(file, type: m.ntfy.attachment?.type)
+                    } catch { Log.app.error("attachment: \(error.localizedDescription, privacy: .public)") }
+                }
             case let .playSound(name):
                 NSSound(named: NSSound.Name(name))?.play()
             case let .openURL(url):
@@ -51,6 +62,31 @@ final class EffectPerformer {
     func copy(_ text: String) {
         NSPasteboard.general.clearContents()
         NSPasteboard.general.setString(text, forType: .string)
+    }
+
+    /// message id -> saved file, so Copy file after Download (or an auto-download) doesn't fetch twice.
+    private var savedFiles: [String: URL] = [:]
+
+    private func attachmentFile(_ m: Message) async throws -> URL {
+        if let url = savedFiles[m.id], FileManager.default.fileExists(atPath: url.path) { return url }
+        guard let a = m.ntfy.attachment else { throw AttachmentFile.Failure(errorDescription: "no attachment") }
+        let url = try await AttachmentFile.download(a, server: model.engine.config.topic(m.topicId).flatMap { model.engine.config.server($0.serverId) })
+        savedFiles[m.id] = url
+        return url
+    }
+
+    /// Images paste as a picture anywhere; every other type pastes as a file in Finder.
+    func copyFile(_ file: URL, type: String?) {
+        let pb = NSPasteboard.general
+        pb.clearContents()
+        if type?.lowercased().hasPrefix("image/") == true, let tiff = NSImage(contentsOf: file)?.tiffRepresentation {
+            let item = NSPasteboardItem()
+            item.setData(tiff, forType: .tiff)
+            if let png = NSBitmapImageRep(data: tiff)?.representation(using: .png, properties: [:]) { item.setData(png, forType: .png) }
+            pb.writeObjects([item])
+        } else {
+            pb.writeObjects([file as NSURL])
+        }
     }
 
     func open(_ text: String?) {
@@ -92,6 +128,19 @@ final class EffectPerformer {
         case let .copy(text):
             copy(text)
             flash(button.id, in: state)
+        case let .attachment(copyIt):
+            guard let topicId = content.topicId, let id = content.messageId,
+                  let m = model.engine.history.message(topicId: topicId, id: id) else { state.failed = button.id; return }
+            Task { @MainActor in
+                do {
+                    let file = try await attachmentFile(m)
+                    if copyIt { copyFile(file, type: m.ntfy.attachment?.type) }
+                    flash(button.id, in: state)
+                } catch {
+                    Log.app.error("attachment: \(error.localizedDescription, privacy: .public)")
+                    state.failed = button.id
+                }
+            }
         case .dismiss:
             markRead()
             PopupPanel.dismiss(state)
@@ -138,6 +187,7 @@ final class EffectPerformer {
         case let .summaryNotification(_, _, n): "summaryNotification \(n)"
         case .floodNotification: "floodNotification"
         case .copy: "copy"
+        case .attachment: "attachment"
         case let .playSound(s): "sound \(s)"
         case let .runCommand(_, m, _): "command \(m.ntfy.id)"
         case let .runShortcut(name, _): "shortcut \(name)"

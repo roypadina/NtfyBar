@@ -25,6 +25,7 @@ struct DispatcherTests {
             case .summaryNotification: "summaryNotification"
             case .floodNotification: "floodNotification"
             case .copy: "copy"
+            case .attachment: "attachment"
             case .playSound: "sound"
             case .runCommand: "command"
             case .runShortcut: "shortcut"

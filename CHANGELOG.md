@@ -6,6 +6,9 @@ uses [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Added
+- Attachments: every popup with one gets **Copy file** and **Download** buttons (saved to `~/Downloads/NtfyBar`). Two new per-topic options, **Download attachments** and **Copy the downloaded attachment**, do it on arrival; with the text copy on too, the text is copied first and the file a second later. The server's sign-in is sent only to that server, never to external attachment links; automatic downloads skip files over 100 MB.
+
 ## [1.1.1] - 2026-10-24
 
 ### Added
