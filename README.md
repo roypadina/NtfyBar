@@ -90,8 +90,26 @@ Move `dist/NtfyBar.app` to `/Applications` and open it from there. More in the
 
 Settings live in `~/Library/Application Support/NtfyBar/config.json` and `rules.json`; edits to them (by hand, a script or an agent) apply within 2 seconds, no restart — keep each existing topic's `id`.
 
-The menu shows the connection state, your last messages (unread count next to the bell), **Mark
-All Read**, **Pause Notifications** and **History…**.
+The menu shows the connection state, your last messages (unread count next to the bell), **Send
+Clipboard**, **Publish…**, **Mark All Read**, **Pause Notifications** and **History…**.
+
+### Publish
+
+- **Send Clipboard to “…”** sends what you copied to the topic you last sent to: copied files
+  (one message each, up to 20), else a copied picture as `clip.png`, else the text. The first time,
+  it opens **Publish…**.
+- **Publish…** opens a window: topic, title, extra tags, priority, a message and files (**Add…** or
+  drop them from Finder). The message goes first, then each file as its own message.
+- Text up to 4,000 bytes is a normal message, and up to 2,000 bytes it also gets a **Copy** button in
+  the ntfy phone app. Longer text is sent byte-exact as the file `clip.txt`. Files over 100 MB are
+  refused before upload.
+- Every message is tagged with the sender tag `ntfybar-mac` first, then your tags; the title defaults
+  to the Mac's name. Change them under `publish` in `config.json` (`deviceTag`, `title`).
+- NtfyBar ignores its own messages when they come back on a topic it subscribes to. A topic your
+  server lets you only read answers "not allowed on this topic".
+- Receiving long text: on a topic set to copy or download, a `clip.txt` or `attachment.txt` (plain
+  text up to 1 MB — how long text arrives from NtfyBar or the ntfy app) is copied and shown as text,
+  not as a file. Any other `.txt` stays a file.
 
 ### Popup keys
 

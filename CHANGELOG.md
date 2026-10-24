@@ -4,6 +4,12 @@ All notable changes to NtfyBar are documented here.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project
 uses [Semantic Versioning](https://semver.org/).
 
+## [Unreleased] (1.3.0)
+
+### Added
+- Publish to a topic. Menu **Send Clipboard to “…”** sends the copied files, picture or text to the topic you last sent to; **Publish…** opens a window with topic, title, tags, priority, a message and files (Add… or drop from Finder). Text up to 2,000 bytes gets a **Copy** button on the phone, text over 4,000 bytes goes as `clip.txt`, files over 100 MB are refused. Every message carries the sender tag `ntfybar-mac` first; tag and title live under `publish` in `config.json`. Your own messages coming back are ignored, and sends from the menu or the window never hit the rules/plugins rate limit.
+- Long text that arrives as `clip.txt` or `attachment.txt` (plain text, up to 1 MB) on a topic that copies or downloads is copied and shown as text instead of a file.
+
 ## [1.2.0] - 2026-10-25
 
 ### Added

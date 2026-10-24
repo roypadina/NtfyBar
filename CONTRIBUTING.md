@@ -38,6 +38,7 @@ Screenshots for the README and wiki are rendered off screen with demo data, neve
 dist/NtfyBar.app/Contents/MacOS/NtfyBar --render-popup popup.png
 NTFYBAR_RENDER_TAB=topics dist/NtfyBar.app/Contents/MacOS/NtfyBar --render-settings settings.png
 dist/NtfyBar.app/Contents/MacOS/NtfyBar --render-history history.png
+dist/NtfyBar.app/Contents/MacOS/NtfyBar --render-publish publish.png
 ```
 
 `NTFYBAR_TEST=1` + `NTFYBAR_CONFIG_DIR=<empty dir>` runs the app on a throwaway config and prints
