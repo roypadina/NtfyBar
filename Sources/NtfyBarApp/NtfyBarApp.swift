@@ -58,6 +58,9 @@ struct MenuContent: View {
                 }
             }
         }
+        Button(model.lastPublishTopic.map { "Send Clipboard to “\($0.displayLabel)”" } ?? "Send Clipboard…") { model.sendClipboard() }
+            .disabled(model.clipboardIsEmpty)
+        Button("Publish…") { PublishWindow.show(model: model) }
         Button("Mark All Read") { engine.markAllRead() }
             .disabled(engine.unreadCount == 0)
 

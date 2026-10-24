@@ -64,6 +64,57 @@ final class AppModel {
         performer.showPopup(PopupRequest(message: m, label: label(for: m.topicId), settings: settings), playSound: false)
     }
 
+    // MARK: publish
+
+    /// The topic of the last send, while it exists and is enabled.
+    var lastPublishTopic: TopicConfig? {
+        engine.config.publish.lastTopicId.flatMap { engine.config.topic($0) }.flatMap { $0.enabled ? $0 : nil }
+    }
+
+    var clipboardIsEmpty: Bool { NSPasteboard.general.pasteboardItems?.isEmpty ?? true }
+
+    /// Files on the pasteboard (one message each), else a picture as PNG, else text.
+    static func clipboardItems(_ pb: NSPasteboard = .general) -> [Outgoing] {
+        if let urls = pb.readObjects(forClasses: [NSURL.self], options: [.urlReadingFileURLsOnly: true]) as? [URL], !urls.isEmpty {
+            return urls.map(Outgoing.file)
+        }
+        if let png = pb.data(forType: .png)
+            ?? pb.data(forType: .tiff).flatMap({ NSBitmapImageRep(data: $0)?.representation(using: .png, properties: [:]) }) {
+            return [.image(png)]
+        }
+        if let text = pb.string(forType: .string), !text.isEmpty { return [.text(text)] }
+        return []
+    }
+
+    /// Menu "Send Clipboard to …": to the last topic; none yet → the Publish window.
+    func sendClipboard() {
+        guard let topic = lastPublishTopic else { PublishWindow.show(model: self); return }
+        let items = Self.clipboardItems()
+        guard !items.isEmpty else {
+            notifier.post(NotificationText(title: "Couldn't send: the clipboard is empty", body: ""), category: nil)
+            return
+        }
+        Task {
+            let result = await send(items, topicId: topic.id, title: engine.config.publish.title, tags: [], priority: 3)
+            notifier.post(NotificationText(title: result.text, body: ""), category: nil)
+        }
+    }
+
+    /// A user-initiated send, described for a notification or the window's status line:
+    /// "Sent to “Clipboard” · 2 files" or "Couldn't send: <reason>".
+    func send(_ items: [Outgoing], topicId: UUID, title: String, tags: [String], priority: Int) async -> (ok: Bool, text: String) {
+        let result: (ok: Bool, text: String)
+        do {
+            try await engine.send(items, topicId: topicId, title: title, tags: tags, priority: priority)
+            let files = items.filter { if case .text = $0 { false } else { true } }.count
+            result = (true, "Sent to “\(label(for: topicId))”" + (files == 0 ? "" : " · \(files) file\(files == 1 ? "" : "s")"))
+        } catch {
+            result = (false, "Couldn't send: " + ((error as? PublishError)?.reason ?? error.localizedDescription))
+        }
+        if isTestMode { print("publish \(result.text)"); fflush(stdout) }
+        return result
+    }
+
     /// "Edit rules file…": write the current rules first so there is always a file to edit.
     func openRulesFile() {
         if !FileManager.default.fileExists(atPath: engine.store.rulesURL.path) {
