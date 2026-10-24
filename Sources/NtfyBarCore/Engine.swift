@@ -92,6 +92,7 @@ public final class Engine {
 
     public func stop() {
         saveState()
+        watchTask?.cancel()
         streams.values.forEach { $0.stop() }
         streams.removeAll()
         signatures.removeAll()
@@ -128,6 +129,51 @@ public final class Engine {
         change(&c)
         try store.saveConfig(c)
         config = c
+        lastConfigData = try? Data(contentsOf: store.configURL)
+        applyStreams()
+    }
+
+    /// Checks config.json and rules.json every `interval` seconds and applies edits made outside the
+    /// app (a text editor, a script, an agent) without a restart.
+    public func startWatchingFiles(interval: Double = 2) {
+        lastConfigData = try? Data(contentsOf: store.configURL)
+        lastRulesData = try? Data(contentsOf: store.rulesURL)
+        watchTask?.cancel()
+        watchTask = Task { [weak self] in
+            while !Task.isCancelled {
+                try? await Task.sleep(for: .seconds(interval))
+                self?.reloadIfChangedOnDisk()
+            }
+        }
+    }
+
+    /// Applies a changed config.json / rules.json. A file that doesn't parse (half-written, a typo)
+    /// is ignored and the running settings stay — it is never replaced by defaults or moved aside.
+    public func reloadIfChangedOnDisk() {
+        var changed = false
+        if let data = try? Data(contentsOf: store.configURL), data != lastConfigData {
+            if let c = try? ConfigStore.decoder.decode(Config.self, from: data) {
+                config = c
+                changed = true
+                Log.config.info("config.json changed on disk; applied")
+            } else {
+                Log.config.error("config.json changed on disk but isn't valid JSON; keeping the current settings")
+            }
+            lastConfigData = data
+        }
+        if let data = try? Data(contentsOf: store.rulesURL), data != lastRulesData {
+            if let r = try? ConfigStore.decoder.decode(RulesFile.self, from: data) {
+                rules = r
+                dispatcher.rules.rules = r.rules
+                changed = true
+                Log.config.info("rules.json changed on disk; applied")
+            } else {
+                Log.config.error("rules.json changed on disk but isn't valid JSON; keeping the current rules")
+            }
+            lastRulesData = data
+        }
+        guard changed else { return }
+        reloadPlugins()
         applyStreams()
     }
 
@@ -136,6 +182,7 @@ public final class Engine {
         change(&r.rules)
         try store.saveRules(r)
         rules = r
+        lastRulesData = try? Data(contentsOf: store.rulesURL)
         dispatcher.rules.rules = r.rules
     }
 
@@ -411,6 +458,10 @@ public final class Engine {
     }
 
     @ObservationIgnored private var stateSaveTask: Task<Void, Never>?
+    @ObservationIgnored private var watchTask: Task<Void, Never>?
+    /// What config.json / rules.json held when we last read or wrote them.
+    @ObservationIgnored private var lastConfigData: Data?
+    @ObservationIgnored private var lastRulesData: Data?
 
     private func advanceCursor(serverId: UUID, time: Int64) {
         streams[serverId]?.advanceCursor(to: time)

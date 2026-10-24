@@ -35,6 +35,7 @@ final class AppModel {
         engine.onOpen = { [weak self] in self?.performer.open($0.absoluteString) }
         engine.start()
         engine.startNetworkMonitoring()
+        engine.startWatchingFiles()
         NSWorkspace.shared.notificationCenter.addObserver(forName: NSWorkspace.didWakeNotification, object: nil,
                                                           queue: .main) { [weak self] _ in
             MainActor.assumeIsolated { self?.engine.reconnectAll() }
