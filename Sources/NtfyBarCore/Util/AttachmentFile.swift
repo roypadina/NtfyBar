@@ -22,6 +22,17 @@ public enum AttachmentFile {
 
     public static func autoDownloadAllowed(size: Int64?) -> Bool { (size ?? 0) <= maxAutoBytes }
 
+    public static let maxTextClipBytes: Int64 = 1024 * 1024
+
+    /// Long text that travels as a file: NtfyBar's and Windows' `clip.txt`, or the server's
+    /// `attachment.txt` for an over-long text body. Handled as text, not as a file. Any other
+    /// `.txt` (e.g. notes.txt from Finder) stays a file.
+    public static func isTextClip(_ a: NtfyAttachment?) -> Bool {
+        guard let a, a.name == "clip.txt" || a.name == "attachment.txt",
+              a.type?.lowercased().hasPrefix("text/plain") == true, let size = a.size else { return false }
+        return size <= maxTextClipBytes
+    }
+
     /// Authorization header only when scheme + host + port equal the server's base URL.
     public static func authHeader(for url: URL, server: ServerConfig?) -> String? {
         guard let base = server?.baseURL, let value = server?.auth.headerValue, sameOrigin(url, base) else { return nil }
@@ -90,6 +101,21 @@ public enum AttachmentFile {
             }
             completionHandler(req)
         }
+    }
+
+    /// A text clip's content (≤ 1 MB, UTF-8), same credential rules as `download`; nothing is saved.
+    public static func downloadText(_ a: NtfyAttachment, server: ServerConfig?, session: URLSession = AttachmentFile.session) async throws -> String {
+        guard let url = SafeOpen.url(a.url) else { throw Failure(errorDescription: "attachment has no http(s) URL") }
+        var req = URLRequest(url: url, timeoutInterval: 30)
+        req.setValue(authHeader(for: url, server: server), forHTTPHeaderField: "Authorization")
+        let (data, response) = try await session.data(for: req, delegate: RedirectGuard())
+        if let http = response as? HTTPURLResponse, !(200..<300).contains(http.statusCode) {
+            throw Failure(errorDescription: "attachment download failed: HTTP \(http.statusCode)")
+        }
+        guard Int64(data.count) <= maxTextClipBytes, let text = String(data: data, encoding: .utf8) else {
+            throw Failure(errorDescription: "text attachment is not UTF-8 text up to 1 MB")
+        }
+        return text
     }
 
     /// Downloads into `directory` (created on demand) and returns the saved file.

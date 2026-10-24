@@ -71,9 +71,13 @@ public struct PublishRequest: Equatable, Sendable {
     public var click: String?
     /// Seconds until ntfy delivers it (scheduled message); nil = now.
     public var delay: Int?
+    /// Set = sent as a file attachment (PUT with these bytes); JSON can't carry a file.
+    public var file: PublishFile?
+    /// Adds ntfy's `copy` action: a one-tap Copy button for `message` on the phone.
+    public var copyButton: Bool
 
     public init(topicId: UUID, title: String? = nil, message: String, priority: Int = 3, tags: [String] = [], click: String? = nil,
-                delay: Int? = nil) {
+                delay: Int? = nil, file: PublishFile? = nil, copyButton: Bool = false) {
         self.topicId = topicId
         self.title = title
         self.message = message
@@ -81,5 +85,17 @@ public struct PublishRequest: Equatable, Sendable {
         self.tags = tags
         self.click = click
         self.delay = delay
+        self.file = file
+        self.copyButton = copyButton
+    }
+}
+
+public struct PublishFile: Equatable, Sendable {
+    public var name: String
+    public var data: Data
+
+    public init(name: String, data: Data) {
+        self.name = name
+        self.data = data
     }
 }

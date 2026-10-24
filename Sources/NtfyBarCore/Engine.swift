@@ -354,6 +354,20 @@ public final class Engine {
         }
     }
 
+    /// A user-initiated send (menu, Publish window): each item is one message, in order, to one
+    /// topic. The sender tag goes first in the tags. Not rate limited; the loop guard applies.
+    /// Every item is checked before the first upload. Returns how many messages went out.
+    @discardableResult
+    public func send(_ items: [Outgoing], topicId: UUID, title: String?, tags: [String], priority: Int) async throws -> Int {
+        let tags = ([config.publish.deviceTag] + tags).map { $0.trimmingCharacters(in: .whitespaces) }.filter { !$0.isEmpty }
+        let base = PublishRequest(topicId: topicId, title: title?.isEmpty == false ? title : nil, message: "",
+                                  priority: min(5, max(1, priority)), tags: tags)
+        let requests = try Outgoing.requests(items, base: base)
+        for r in requests { try await publish(r, rateKey: nil) }
+        if config.publish.lastTopicId != topicId { try? update { $0.publish.lastTopicId = topicId } }
+        return requests.count
+    }
+
     private static func signature(topicId: UUID, title: String?, message: String) -> String {
         "\(topicId.uuidString)\u{1F}\(title ?? "")\u{1F}\(message)"
     }
@@ -452,6 +466,27 @@ public final class Engine {
             return
         }
         refreshCounters()
+        if let topic = config.topic(m.topicId), AttachmentFile.isTextClip(m.ntfy.attachment), let a = m.ntfy.attachment,
+           topic.copyToClipboard || topic.downloadAttachments, !m.isCatchUp || topic.processMissed {
+            // Long text sent as a file: fetch it and handle the message as that text (copied as
+            // text, shown as text). On failure it is handled as the file it is.
+            let server = config.server(topic.serverId)
+            Task { [weak self, session] in
+                var t = m
+                if let text = try? await AttachmentFile.downloadText(a, server: server, session: session) {
+                    t.ntfy.message = text
+                    t.ntfy.attachment = nil
+                } else {
+                    Log.dispatch.error("text attachment download failed; handled as a file")
+                }
+                self?.dispatch(t)
+            }
+            return
+        }
+        dispatch(m)
+    }
+
+    private func dispatch(_ m: Message) {
         let effects = dispatcher.handle(m, config: config, now: now())
         if !effects.isEmpty { onEffects?(effects) }
         if dispatcher.hasPendingCatchUp { scheduleCatchUpFlush() }
