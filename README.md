@@ -99,7 +99,8 @@ Clipboard**, **Publish…**, **Mark All Read**, **Pause Notifications** and **Hi
   (one message each, up to 20), else a copied picture as `clip.png`, else the text. The first time,
   it opens **Publish…**.
 - **Publish…** opens a window: topic, title, extra tags, priority, a message and files (**Add…** or
-  drop them from Finder). The message goes first, then each file as its own message.
+  drop them from Finder onto the window, not the Message box). The message goes first, then each file as its own message. If a send fails midway, the status
+  says how many went out; sending again repeats those.
 - Text up to 4,000 bytes is a normal message, and up to 2,000 bytes it also gets a **Copy** button in
   the ntfy phone app. Longer text is sent byte-exact as the file `clip.txt`. Files over 100 MB are
   refused before upload.

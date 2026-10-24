@@ -53,13 +53,15 @@ public enum PublishError: Error, Equatable {
     case fileTooLarge(String)
     case tooManyFiles
     case unreadableFile(String)
+    /// A multi-item send stopped after `sent` messages went out; re-sending repeats those.
+    indirect case partial(sent: Int, of: Int, cause: PublishError)
 
     /// One line for "Couldn't send: …".
     public var reason: String {
         switch self {
         case .unknownTopic: "the topic no longer exists"
         case .invalidServer: "the server URL is not valid"
-        case .rateLimited: "too many messages, try again in a minute"
+        case .rateLimited, .http(429): "too many messages, try again in a minute"
         case .http(401), .http(403): "not allowed on this topic"
         case .http(413): "too large for the server"
         case let .http(code): "HTTP \(code)"
@@ -67,6 +69,7 @@ public enum PublishError: Error, Equatable {
         case let .fileTooLarge(name): "“\(name)” is over 100 MB"
         case .tooManyFiles: "more than \(Outgoing.maxFiles) files"
         case let .unreadableFile(name): "can't read “\(name)”"
+        case let .partial(sent, total, cause): "sent \(sent) of \(total), then \(cause.reason)"
         }
     }
 }

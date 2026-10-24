@@ -374,6 +374,8 @@ final class SendTests {
         #expect(PublishError.http(500).reason == "HTTP 500")
         #expect(PublishError.transport("offline").reason == "server unreachable")
         #expect(PublishError.fileTooLarge("a.mov").reason == "“a.mov” is over 100 MB")
+        #expect(PublishError.http(429).reason == PublishError.rateLimited.reason)
+        #expect(PublishError.partial(sent: 2, of: 5, cause: .http(500)).reason == "sent 2 of 5, then HTTP 500")
     }
 
     func engine(_ configure: (inout TopicConfig) -> Void = { _ in }) throws -> Engine {
@@ -402,6 +404,19 @@ final class SendTests {
                 "12 sends in a row: the 10/min limit is for rules and plugins")
         #expect(e.config.publish.lastTopicId == topicId)
         #expect(e.store.loadConfig().publish.lastTopicId == topicId)
+    }
+
+    /// A send that fails midway says how many went out (re-sending repeats them); a first-item failure stays plain.
+    @Test func midwayFailureReportsWhatWasSent() async throws {
+        StubProtocol.register(host) { _, attempt in attempt == 0 ? [.status(200), .line(#"{"id":"s"}"#), .end] : [.status(500), .end] }
+        let e = try engine()
+        defer { e.stop() }
+        await #expect(throws: PublishError.partial(sent: 1, of: 2, cause: .http(500))) {
+            try await e.send([.text("a"), .text("b")], topicId: topicId, title: "", tags: [], priority: 3)
+        }
+        await #expect(throws: PublishError.http(500)) {
+            try await e.send([.text("c")], topicId: topicId, title: "", tags: [], priority: 3)
+        }
     }
 
     /// The loop guard covers file sends: the PUT's id (or, if the echo wins, title + file name).

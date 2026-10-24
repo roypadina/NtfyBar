@@ -99,6 +99,7 @@ struct PublishView: View {
             .padding(.bottom, 14)
         }
         .frame(minWidth: 440, minHeight: 500)
+        // shortcut: a file dropped onto the Message box lands in its NSTextView as a path; drop on the rest of the window. Upgrade with an AppKit text view if that bites.
         .dropDestination(for: URL.self) { urls, _ in
             let new = urls.filter { $0.isFileURL && !files.contains($0) }
             files += new

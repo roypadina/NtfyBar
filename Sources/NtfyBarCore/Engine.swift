@@ -363,13 +363,18 @@ public final class Engine {
         let base = PublishRequest(topicId: topicId, title: title?.isEmpty == false ? title : nil, message: "",
                                   priority: min(5, max(1, priority)), tags: tags)
         let requests = try Outgoing.requests(items, base: base)
-        for r in requests { try await publish(r, rateKey: nil) }
+        for (i, r) in requests.enumerated() {
+            do { try await publish(r, rateKey: nil) } catch let e as PublishError where i > 0 {
+                throw PublishError.partial(sent: i, of: requests.count, cause: e)
+            }
+        }
         if config.publish.lastTopicId != topicId { try? update { $0.publish.lastTopicId = topicId } }
         return requests.count
     }
 
     private static func signature(topicId: UUID, title: String?, message: String) -> String {
-        "\(topicId.uuidString)\u{1F}\(title ?? "")\u{1F}\(message)"
+        // ntfy trims the message, so a clipboard text ending in "\n" must still match its echo.
+        "\(topicId.uuidString)\u{1F}\(title ?? "")\u{1F}\(message.trimmingCharacters(in: .whitespacesAndNewlines))"
     }
 
     /// Bounded: entries live 2 minutes, at most 1000 ids.
