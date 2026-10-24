@@ -16,6 +16,7 @@ struct NtfyBarApp: App {
         Settings {
             SettingsView(model: model, engine: model.engine)
         }
+        .windowResizability(.contentMinSize)
     }
 
     static let koFiURL = URL(string: "https://ko-fi.com/roypadina")!

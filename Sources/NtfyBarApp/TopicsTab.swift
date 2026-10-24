@@ -37,7 +37,7 @@ struct TopicsTab: View {
                 }
                 .id("new")
             } else if let id = selection, let topic = engine.config.topic(id) {
-                TopicEditor(model: model, engine: engine, draft: topic, isNew: false) { _ in }.id(id)
+                TopicEditor(model: model, engine: engine, draft: topic, isNew: false, onRemove: { confirmDelete = true }) { _ in }.id(id)
             } else {
                 VStack(spacing: 8) {
                     Text(engine.config.topics.isEmpty ? "No topics yet." : "Select a topic.").font(.headline)
@@ -78,6 +78,7 @@ struct TopicEditor: View {
     let engine: Engine
     @State var draft: TopicConfig
     let isNew: Bool
+    var onRemove: (() -> Void)? = nil
     let onDone: (UUID?) -> Void
     @State private var error: String?
     @State private var status: String?
@@ -147,6 +148,7 @@ struct TopicEditor: View {
 
             Section {
                 HStack {
+                    if let onRemove { Button("Remove Topic…", role: .destructive, action: onRemove) }
                     Button("Send Test Message", action: sendTest).disabled(isNew)
                     if let status { Text(status).foregroundStyle(.secondary) }
                     Spacer()

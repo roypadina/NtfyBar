@@ -43,7 +43,7 @@ struct RulesTab: View {
                 }
                 .id("new")
             } else if let id = selection, let rule = rules.first(where: { $0.id == id }) {
-                RuleEditor(engine: engine, draft: rule) { _ in }.id(id)
+                RuleEditor(engine: engine, draft: rule, onRemove: { remove() }) { _ in }.id(id)
             } else {
                 VStack(spacing: 8) {
                     Text("Rules run on every message that matches, top to bottom.").font(.headline)
@@ -73,7 +73,9 @@ struct RulesTab: View {
 struct RuleEditor: View {
     let engine: Engine
     @State var draft: Rule
+    var onRemove: (() -> Void)? = nil
     let onDone: (UUID?) -> Void
+    @State private var confirmRemove = false
     @State private var status: String?
 
     var body: some View {
@@ -102,6 +104,7 @@ struct RuleEditor: View {
             Section {
                 Toggle("Skip the topic's own notification/popup/copy/command", isOn: $draft.skipTopicDefaults)
                 HStack {
+                    if onRemove != nil { Button("Remove Rule…", role: .destructive) { confirmRemove = true } }
                     if let status { Text(status).foregroundStyle(.secondary) }
                     Spacer()
                     Button("Save", action: save).keyboardShortcut(.defaultAction)
@@ -111,6 +114,10 @@ struct RuleEditor: View {
             }
         }
         .formStyle(.grouped)
+        .alert("Remove this rule?", isPresented: $confirmRemove) {
+            Button("Remove", role: .destructive) { onRemove?() }
+            Button("Cancel", role: .cancel) {}
+        }
     }
 
     private func save() {

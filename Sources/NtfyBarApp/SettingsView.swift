@@ -23,7 +23,7 @@ struct SettingsView: View {
             AboutTab()
                 .tabItem { Label("About", systemImage: "info.circle") }.tag("about")
         }
-        .frame(width: 720, height: 560)
+        .frame(minWidth: 820, idealWidth: 900, minHeight: 640, idealHeight: 720)
         .onAppear { if tab.isEmpty { tab = initialTab } }
     }
 }
@@ -162,7 +162,7 @@ struct ServersTab: View {
                 }
                 .id("new")
             } else if let id = selection, let server = engine.config.server(id) {
-                ServerEditor(engine: engine, draft: server, isNew: false) { _ in }.id(id)
+                ServerEditor(engine: engine, draft: server, isNew: false, onRemove: { remove() }) { _ in }.id(id)
             } else {
                 Text("Select a server, or add your own ntfy server with +.").foregroundStyle(.secondary)
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -182,8 +182,10 @@ struct ServerEditor: View {
     let engine: Engine
     @State var draft: ServerConfig
     let isNew: Bool
+    var onRemove: (() -> Void)? = nil
     let onDone: (UUID?) -> Void
     @State private var authType = "none"
+    @State private var confirmRemove = false
     @State private var user = ""
     @State private var pass = ""
     @State private var token = ""
@@ -211,6 +213,12 @@ struct ServerEditor: View {
             }
             Section {
                 HStack {
+                    if onRemove != nil {
+                        let inUse = engine.config.topics.contains { $0.serverId == draft.id }
+                        Button("Remove Server…", role: .destructive) { confirmRemove = true }
+                            .disabled(inUse)
+                            .help(inUse ? "Remove or move its topics first" : "")
+                    }
                     if let error { Text(error).foregroundStyle(.red) }
                     Spacer()
                     Button("Save", action: save).keyboardShortcut(.defaultAction)
@@ -221,6 +229,12 @@ struct ServerEditor: View {
             }
         }
         .formStyle(.grouped)
+        .alert("Remove this server?", isPresented: $confirmRemove) {
+            Button("Remove", role: .destructive) { onRemove?() }
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text("Its address and sign-in details are deleted from NtfyBar.")
+        }
         .onAppear {
             switch draft.auth {
             case .none: authType = "none"
