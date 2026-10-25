@@ -30,6 +30,11 @@ final class AppModel {
         guard !started else { return }
         started = true
         notifier.setUp(model: self)
+        if !engine.migrationNotes.isEmpty {
+            let n = engine.migrationNotes.filter { $0.hasPrefix("absorbed rule") }.count  // one such note per absorbed rule
+            notifier.post(NotificationText(title: "NtfyBar 1.4: \(n) rule\(n == 1 ? "" : "s") became topic plans",
+                                           body: "Backups: config.pre-1.4.json, rules.pre-1.4.json"), category: nil)
+        }
         engine.onEffects = { [weak self] in self?.performer.perform($0) }
         engine.onCopy = { [weak self] in self?.performer.copy($0) }
         engine.onOpen = { [weak self] in self?.performer.open($0.absoluteString) }

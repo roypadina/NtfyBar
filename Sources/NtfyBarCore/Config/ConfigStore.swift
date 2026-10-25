@@ -40,6 +40,19 @@ public struct ConfigStore: Sendable {
     public func loadConfig() -> Config { load(Config.self, from: configURL) ?? Config() }
     public func saveConfig(_ config: Config) throws { try save(config, to: configURL) }
 
+    /// "config.json" → "config.pre-1.4.json", same directory.
+    public func backupURL(_ url: URL) -> URL {
+        directory.appendingPathComponent(url.deletingPathExtension().lastPathComponent + ".pre-1.4.json")
+    }
+
+    /// Copies `url` to its `backupURL` (mode 600, overwritten), when it exists.
+    public func backup(_ url: URL) throws {
+        guard let data = try? Data(contentsOf: url) else { return }
+        let to = backupURL(url)
+        try data.write(to: to, options: .atomic)
+        try FileManager.default.setAttributes([.posixPermissions: 0o600], ofItemAtPath: to.path)
+    }
+
     public func loadState() -> StreamState { load(StreamState.self, from: stateURL) ?? StreamState() }
     public func saveState(_ state: StreamState) throws { try save(state, to: stateURL) }
 
