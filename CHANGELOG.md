@@ -4,6 +4,32 @@ All notable changes to NtfyBar are documented here.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project
 uses [Semantic Versioning](https://semver.org/).
 
+## [1.4.0] - 2026-10-25
+
+### Added
+- One plan per topic: **Settings › Topics** shows what you see (nothing, notification, popup, both), when a popup closes (Stays, 5 s … 5 min) and which sound plays — one plan for every priority and, behind one switch (**Handle important messages differently**), a second one for important messages (priority 4 and up, or urgent only); the five-row table appears only for a plan that fits neither, with a one-click way back (**Use simple settings…**).
+- A plugin card (Alert Card, ACK Button, …) can be a topic's popup style, with its parameters in the topic editor.
+- The topic editor lists the rules that also apply to the topic, marked **Also** or **Instead**; the sidebar sums up each topic's plan.
+- Rules say **Also do the actions below** or **Instead of the topic's plan**, and the rule list shows each rule's topics.
+- Save (and Remove, Send Test Message) stay pinned below the Topics and Rules editors.
+- Plugins say what each one adds (popup card, rule action, rule condition).
+
+### Changed
+- New topics start with one plan for every priority (no automatic "urgent stays" or Basso/Glass sounds). Switching on **Handle important messages differently** pre-fills priority 4–5 with Stays (and Basso, if no sound is set).
+- `config.json` topic shape: `alerts` (per priority) and `popup` as a style (`level`, `position`, `showCopy`, `showOpen`, optional `card`). Topics with the 1.3 keys are still read and are rewritten in the new shape on the next save.
+- The first launch of 1.4 folds rules that only set a priority band's popup, sound or notification into the topic plans, once. The previous files are kept as `config.pre-1.4.json` and `rules.pre-1.4.json` and one notification says how many rules moved. Every other rule is kept as it was. To go back to 1.3.1, restore those two files.
+- A rule's **Show popup** without its own timeout uses the topic plan's **Close the popup after** for that priority; a rule popup with its own timeout no longer stays for urgent messages (1.3 applied the topic's "urgent stays" to it).
+- The "N messages while you were away" summary now comes for every topic whose plan shows anything (notification, popup or card), not only for topics with notifications on; a topic set to **Nothing** for every priority stays quiet.
+- Quiet hours are named **Quiet hours for sending** and say that incoming messages are not affected.
+- The rule action `builtin.ignore` is shown as **Skip the topic's plan** (same id).
+- Settings and the popup follow the house style of the other Mac apps: sidebars with status dots and a caption (sign-in kind for servers), Save and Remove pinned below every editor, rule conditions and actions as cards (Match ALL / ANY, ⓘ for each step's description, topics as a checkbox grid), plugin source and "Unverified" pills, a centred About tab with the version, **Pause notifications** as one menu, quiet-hours times that save as soon as both are valid. The popup is 520 pt wide with larger title and buttons, tags as pills and a **More** menu; History has alternating rows.
+
+### Fixed
+- Removing a topic switches off a rule that was limited to that topic only, instead of turning it into an "Any topic" rule.
+
+### Removed
+- `notify`, `soundOverride` and `popup.enabled` / `timeoutSec` / `stickyForUrgent` / `soundByPriority` are no longer written to new config files (they are still read).
+
 ## [1.3.1] - 2026-10-25
 
 ### Changed

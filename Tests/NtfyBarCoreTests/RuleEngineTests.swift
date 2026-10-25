@@ -119,7 +119,7 @@ struct RuleEngineTests {
 
     @Test func skipTopicDefaultsThroughDispatcher() {
         var c = config
-        c.topics[0].popup.enabled = true
+        c.topics[0].alerts = AlertBand.expand(notify: true, popup: { var p = PopupSettings(); p.enabled = true; return p }(), soundOverride: nil)
         let rule = Rule(name: "quiet", conditions: [cond("builtin.titleContains", ["needle": .string("noise")])],
                         actions: [RuleStep("builtin.copy", ["what": .string("title")])], skipTopicDefaults: true)
         let d = Dispatcher(rules: RuleEngine(rules: [rule]))
@@ -127,6 +127,19 @@ struct RuleEngineTests {
         let viaIgnore = Dispatcher(rules: RuleEngine(rules: [Rule(name: "i", conditions: [cond("builtin.titleContains", ["needle": .string("noise")])],
                                                                   actions: [RuleStep("builtin.ignore")])]))
         #expect(viaIgnore.handle(makeMessage(topicId: topicId, title: "noise"), config: c, now: Date()).isEmpty)
+    }
+
+    @Test func builtinPopupInheritsTheBandTimeout() {
+        var c = config
+        c.topics[0].alerts["4"] = AlertBand(show: .popup, timeoutSec: 0)
+        let m = makeMessage(topicId: topicId, priority: 4)
+        let ctx = ProviderContext(message: m, topic: c.topics[0], config: c)
+        func timeout(_ p: Params) -> Int? {
+            guard case let .popup(req)? = try? ProviderRegistry().run("builtin.popup", ctx, p).effects.first else { return nil }
+            return req.settings.timeoutSec
+        }
+        #expect(timeout([:]) == 0)
+        #expect(timeout(["timeoutSec": .number(7)]) == 7)
     }
 
     @Test func catchUpSkipsRulesUnlessProcessMissed() {

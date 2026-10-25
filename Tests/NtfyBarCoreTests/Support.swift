@@ -148,3 +148,17 @@ extension Array {
     /// nil instead of a crash when a test's request never arrived.
     subscript(safe i: Int) -> Element? { indices.contains(i) ? self[i] : nil }
 }
+
+/// Built-ins plus a stub plugin card action `id` that answers with a fixed plugin popup (or throws).
+@MainActor
+func cardRegistry(_ id: String = "com.example.card.show", throwing: Bool = false) -> ProviderRegistry {
+    let r = ProviderRegistry()
+    r.register(ProviderDescriptor(id: id, kind: .action, name: "Show card", description: "", packageId: "com.example.card")) { ctx, _ in
+        if throwing { throw ProviderError.failed("broken plugin") }
+        let spec = try PopupSpec.parse(.object(["title": .string("Card")]))
+        return ActionOutput([.pluginPopup(PluginPopupRequest(pluginId: "com.example.card", pluginName: "Card", spec: spec, topicId: ctx.topic.id,
+                                                             messageId: ctx.message.ntfy.id, label: ctx.label,
+                                                             defaults: ctx.topic.popup.settings(timeoutSec: 0)))])
+    }
+    return r
+}

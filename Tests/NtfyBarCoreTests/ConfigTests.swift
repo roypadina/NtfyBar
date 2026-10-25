@@ -13,8 +13,8 @@ struct ConfigTests {
         #expect(c.servers.count == 1)
         #expect(c.topics.count == 1)
         #expect(c.topics[0].label == "Builds")
-        #expect(c.topics[0].notify == true)  // wrong type → default, not a failed decode
-        #expect(c.topics[0].popup.timeoutSec == 20)
+        #expect(c.topics[0].band(3).show == .notification)  // wrong type → default, not a failed decode
+        #expect(c.topics[0].band(3).timeoutSec == 20)
         #expect(c.topics[0].retention == Retention(count: 500, days: 30))
     }
 
@@ -100,6 +100,114 @@ struct ConfigTests {
         #expect(c.isPaused(at: now))
         c.pausedUntil = now.addingTimeInterval(-1)
         #expect(!c.isPaused(at: now))
+    }
+
+    // MARK: 1.4 plans
+
+    func topic(_ json: String) throws -> TopicConfig {
+        try JSONDecoder().decode(TopicConfig.self, from: Data(json.utf8))
+    }
+
+    @Test func legacyTopicExpandsIntoFiveBands() throws {
+        let t = try topic(#"{"notify":true,"popup":{"enabled":true,"timeoutSec":20,"stickyForUrgent":true,"soundByPriority":{"5":"Basso","4":"Glass"},"level":"overFullScreen","position":"topRight","showCopy":false,"showOpen":false}}"#)
+        #expect(t.band(5) == AlertBand(show: .both, timeoutSec: 0, sound: "Basso"))
+        #expect(t.band(4) == AlertBand(show: .both, timeoutSec: 20, sound: "Glass"))
+        for p in 1...3 { #expect(t.band(p) == AlertBand(show: .both, timeoutSec: 20, sound: nil)) }
+        #expect(t.popup.level == .overFullScreen && t.popup.position == .topRight && !t.popup.showCopy && !t.popup.showOpen)
+        #expect(t.popup.card == nil)
+    }
+
+    @Test func legacySoundOverrideWinsOnEveryBand() throws {
+        let t = try topic(#"{"notify":true,"soundOverride":"Ping","popup":{"enabled":true}}"#)
+        for p in 1...5 { #expect(t.band(p).sound == "Ping") }
+        let off = try topic(#"{"notify":true,"soundOverride":"Ping"}"#)
+        for p in 1...5 { #expect(off.band(p) == AlertBand(show: .notification, timeoutSec: p == 5 ? 0 : 20, sound: "Ping")) }
+    }
+
+    @Test func legacyPopupOffMeansNoPopupSound() throws {
+        let t = try topic(#"{"notify":true,"popup":{"enabled":false,"soundByPriority":{"5":"Basso"}}}"#)
+        for p in 1...5 { #expect(t.band(p).show == .notification && t.band(p).sound == nil) }
+    }
+
+    @Test func legacyNotifyOffPopupOffIsNothing() throws {
+        let t = try topic(#"{"notify":false}"#)
+        for p in 1...5 { #expect(t.band(p).show == .nothing) }
+        #expect(!t.notifiesSomewhere && !t.popsUpSomewhere)
+    }
+
+    @Test func newShapeRoundTrips() throws {
+        var c = Config()
+        var t = TopicConfig(serverId: c.servers[0].id, topic: "ntfybar-9f3a1c7b2e", label: "NAS")
+        t.alerts["5"] = AlertBand(show: .popup, timeoutSec: 0, sound: "Basso")
+        t.alerts["1"] = AlertBand(show: .nothing)
+        t.popup.position = .topRight
+        t.popup.card = PluginCard(providerId: "com.example.card", params: ["snoozeMin": .number(10)])
+        c.topics = [t]
+        let data = try ConfigStore.encoder.encode(c)
+        #expect(try ConfigStore.decoder.decode(Config.self, from: data) == c)
+        let json = try #require(JSONSerialization.jsonObject(with: data) as? [String: Any])
+        #expect(json["schemaVersion"] as? Int == 2)
+        let topic = try #require((json["topics"] as? [[String: Any]])?.first)
+        #expect(topic["notify"] == nil && topic["soundOverride"] == nil)
+        let popup = try #require(topic["popup"] as? [String: Any])
+        for gone in ["enabled", "timeoutSec", "stickyForUrgent", "soundByPriority"] { #expect(popup[gone] == nil, "\(gone)") }
+        #expect((topic["alerts"] as? [String: Any])?.count == 5)
+    }
+
+    @Test func missingBandKeysAreFilled() throws {
+        let t = try topic(#"{"alerts":{"5":{"show":"popup","timeoutSec":0}}}"#)
+        #expect(t.alerts.count == 5)
+        #expect(t.band(5) == AlertBand(show: .popup, timeoutSec: 0))
+        #expect(t.band(2) == AlertBand())
+    }
+
+    @Test func unknownBandKeysDropped() throws {
+        let t = try topic(#"{"alerts":{"0":{"show":"popup"},"6":{"show":"popup"},"urgent":{"show":"popup"},"3":{"show":"nothing"}}}"#)
+        #expect(Set(t.alerts.keys) == ["1", "2", "3", "4", "5"])
+        #expect(t.band(3).show == .nothing && !t.popsUpSomewhere)
+    }
+
+    @Test func emptySoundIsNil() throws {
+        #expect(try topic(#"{"alerts":{"4":{"show":"both","sound":""}}}"#).band(4).sound == nil)
+        #expect(try topic(#"{"notify":true,"soundOverride":"","popup":{"enabled":true}}"#).band(5).sound == nil)
+    }
+
+    // MARK: plan shape
+
+    func bands(_ b: (Int) -> AlertBand) -> TopicConfig {
+        var t = TopicConfig(serverId: UUID(), topic: "ntfybar-9f3a1c7b2e", label: "T")
+        for p in 1...5 { t.alerts[String(p)] = b(p) }
+        return t
+    }
+
+    @Test func planShapeIgnoresTimeoutWithoutPopup() throws {
+        let t = try topic(#"{"notify":true}"#)
+        #expect(t.band(5) != t.band(3))  // urgent's timeout 0 is noise without a popup
+        #expect(t.planShape == .same)
+    }
+
+    @Test func planShapeTwoGroups() {
+        let nas = bands { $0 >= 4 ? AlertBand(show: .popup, timeoutSec: 0, sound: "Basso") : AlertBand(show: .popup, timeoutSec: 10) }
+        #expect(nas.planShape == .important(minPriority: 4))
+        let github = bands { $0 == 5 ? AlertBand(show: .popup, timeoutSec: 0) : AlertBand(show: .popup, timeoutSec: 10) }
+        #expect(github.planShape == .important(minPriority: 5))
+    }
+
+    @Test func planShapeCustom() {
+        let pair = bands { AlertBand(show: .popup, timeoutSec: 0, sound: ["5": "Basso", "4": "Glass"][String($0)]) }
+        #expect(pair.planShape == .custom)
+        let fromThree = bands { $0 >= 3 ? AlertBand(show: .popup, timeoutSec: 0) : AlertBand(show: .popup, timeoutSec: 10) }
+        #expect(fromThree.planShape == .custom)
+    }
+
+    @Test func effectiveKeepsSoundForNothing() {
+        #expect(AlertBand(show: .nothing, sound: "Basso").effective.sound == "Basso")
+        #expect(AlertBand(show: .nothing, timeoutSec: 30).effective.timeoutSec == 0)
+    }
+
+    @Test func schemaVersionDefaultsToOneWhenAbsent() throws {
+        #expect(try JSONDecoder().decode(Config.self, from: Data("{}".utf8)).schemaVersion == 1)
+        #expect(Config().schemaVersion == 2)
     }
 }
 

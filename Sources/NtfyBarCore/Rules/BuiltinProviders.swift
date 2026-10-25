@@ -69,8 +69,7 @@ enum BuiltinProviders {
                 ParamSpec("position", "Position", .choice, choices: PopupSettings.Position.allCases.map(\.rawValue)),
                 ParamSpec("buttonLabel", "Extra button label", placeholder: "Open dashboard"),
                 ParamSpec("buttonURL", "Extra button URL template", placeholder: "https://example.com/?q={title}")]) { ctx, p in
-            var s = ctx.topic.popup
-            s.enabled = true
+            var s = ctx.topic.popup.settings(timeoutSec: ctx.topic.band(ctx.message.priority).timeoutSec)
             if let t = p.int("timeoutSec") { s.timeoutSec = max(0, t) }
             if let l = p.string("level").flatMap(PopupSettings.Level.init(rawValue:)) { s.level = l }
             if let pos = p.string("position").flatMap(PopupSettings.Position.init(rawValue:)) { s.position = pos }
@@ -138,7 +137,7 @@ enum BuiltinProviders {
                [ParamSpec("name", "Sound name", placeholder: "Glass")]) { _, p in
             ActionOutput([.playSound(try p.required("name"))])
         }
-        action("builtin.ignore", "Skip topic defaults", "Don't run the topic's own notification/popup/copy/command for this message.") { _, _ in
+        action("builtin.ignore", "Skip the topic's plan", "Don't run the topic's plan for this message (same as Instead with no actions).") { _, _ in
             ActionOutput(suppressDefaults: true)
         }
     }

@@ -74,7 +74,7 @@ struct AttachmentTests {
     func dispatch(download: Bool, copyFile: Bool, copyText: Bool, size: Int64? = 1000, attachment: Bool = true) -> [Effect] {
         var c = Config()
         var t = TopicConfig(serverId: c.servers[0].id, topic: "ntfybar-9f3a1c7b2e", label: "Photos")
-        t.notify = false
+        t.alerts = AlertBand.expand(notify: false, popup: PopupSettings(), soundOverride: nil)
         t.downloadAttachments = download
         t.copyAttachment = copyFile
         t.copyToClipboard = copyText
@@ -119,11 +119,11 @@ struct AttachmentTests {
         c.topics = [t]
         var m = makeMessage(topicId: t.id)
         m.ntfy.attachment = NtfyAttachment(name: "p.jpg", url: "https://x.example/p.jpg")
-        let ids = PopupContent.forMessage(PopupRequest(message: m, label: "x", settings: t.popup)).buttons.map(\.id)
+        let ids = PopupContent.forMessage(PopupRequest(message: m, label: "x", settings: t.popup.settings(timeoutSec: 20))).buttons.map(\.id)
         #expect(ids.contains("attach-copy") && ids.contains("attach-download") && ids.contains("attach-folder"))
         m.ntfy.attachment = NtfyAttachment(name: "p.jpg", url: "file:///etc/passwd")
-        #expect(!PopupContent.forMessage(PopupRequest(message: m, label: "x", settings: t.popup)).buttons.map(\.id).contains("attach-copy"))
+        #expect(!PopupContent.forMessage(PopupRequest(message: m, label: "x", settings: t.popup.settings(timeoutSec: 20))).buttons.map(\.id).contains("attach-copy"))
         m.ntfy.attachment = nil
-        #expect(!PopupContent.forMessage(PopupRequest(message: m, label: "x", settings: t.popup)).buttons.map(\.id).contains("attach-download"))
+        #expect(!PopupContent.forMessage(PopupRequest(message: m, label: "x", settings: t.popup.settings(timeoutSec: 20))).buttons.map(\.id).contains("attach-download"))
     }
 }

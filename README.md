@@ -28,9 +28,9 @@ a copy to the clipboard, a shell command, or rules and plugins.
 ## Features
 
 - **Topics on ntfy.sh or your own server** — several servers, with username/password or access-token sign-in. Live streaming with automatic reconnect; messages sent while your Mac was asleep or offline are fetched and summed up in one notification instead of a flood.
-- **Per topic, choose what happens:** macOS notification · NtfyBar popup · copy to clipboard · download attachments (and copy the file, e.g. a shared photo; popup buttons Copy file · Download · Open folder) · run your own shell command · any combination.
-- **Popups that don't get missed** — float above your windows (optionally above full-screen apps) without stealing focus, stack neatly, show priority as colour *and* icon *and* word, render markdown, and carry the message's own action buttons (open a link, send an HTTP request). Urgent ones stay until you dismiss them.
-- **Rules** — conditions (priority, title/message text or regex, tags, JSON, …) and actions (popup, copy, open a URL, run a command or Shortcut, publish a reply, play a sound, skip the topic defaults). Edit them in Settings or in `rules.json`.
+- **Per topic, one plan by priority:** nothing, a macOS notification, NtfyBar's popup or a plugin card, how long it stays, which sound — plus copy to clipboard, download attachments (and copy the file, e.g. a shared photo; popup buttons Copy file · Download · Open folder), run your own shell command.
+- **Popups that don't get missed** — float above your windows (optionally above full-screen apps) without stealing focus, stack neatly, show priority as colour *and* icon *and* word, render markdown, and carry the message's own action buttons (open a link, send an HTTP request). Urgent ones can stay until you dismiss them (Close the popup after: Stays).
+- **Rules** — exceptions to a plan: when a message matches (priority, text, regex, tags, JSON, …) also or instead do something (popup, copy, open a URL, run a command or Shortcut, publish a reply, play a sound). Edit them in Settings or in `rules.json`.
 - **Plugins** — JavaScript conditions, actions and popups in a sandbox with permissions you approve one by one ([marketplace](https://github.com/roypadina/NtfyBar-Plugins)).
 - **History** — every message, searchable, per topic, with read/unread.
 - **Calm by design** — flood guard (a burst of messages becomes one notice and one counting popup), pause for 15 min / 1 h / until resumed, quiet hours for anything NtfyBar sends.
@@ -81,7 +81,9 @@ Move `dist/NtfyBar.app` to `/Applications` and open it from there. More in the
 1. Click the bell in the menu bar → **Settings… › Topics › +**.
 2. Give the topic a label, pick the server and enter the topic name — the same one you use in the
    ntfy phone app or in your scripts. **Random** makes an unguessable one.
-3. Choose what happens when a message arrives, then **Save** and **Send Test Message**.
+3. Set the plan: what you see, how long a popup stays and which sound; switch on **Handle important messages
+   differently** for priority 4 and up. Then **Save** and
+   **Send Test Message** (it shows on your other devices — NtfyBar ignores its own messages).
 4. Send yourself something:
 
    ```sh
@@ -89,6 +91,11 @@ Move `dist/NtfyBar.app` to `/Applications` and open it from there. More in the
    ```
 
 Settings live in `~/Library/Application Support/NtfyBar/config.json` and `rules.json`; edits to them (by hand, a script or an agent) apply within 2 seconds, no restart — keep each existing topic's `id`.
+Since 1.4 a topic's plan is `alerts` (keys `"1"`…`"5"`, each `{"show": "nothing|notification|popup|both", "timeoutSec": 0 = stays, "sound": "Basso"}`)
+plus `popup` (`level`, `position`, `showCopy`, `showOpen`, optional plugin `card`). A topic written with the 1.3 keys
+(`notify`, `popup.enabled`, …) and no `alerts` still works: NtfyBar expands it on load and writes the new shape on the
+next save. The first 1.4 launch folds priority-only rules into topic plans and keeps the old files as
+`config.pre-1.4.json` and `rules.pre-1.4.json` (restore them to go back to 1.3).
 
 The menu shows the connection state, your last messages (unread count next to the bell), **Send
 Clipboard**, **Publish…**, **Mark All Read**, **Pause Notifications** and **History…**.
@@ -141,15 +148,22 @@ controls that text. Commands time out after 30 s by default and run one at a tim
 
 ### Rules and plugins
 
+**Each topic has one plan.** For every ntfy priority — Urgent, High, Default, Low, Min — the plan says what you see
+(nothing, a macOS notification, NtfyBar's popup or a plugin card), how long a popup stays and which sound plays. Below
+that, the plan can also copy the message, download attachments or run a command. **Rules are exceptions** to a plan:
+"when a message matches *this*, also do *that* — or do *that* instead". **Plugins** add cards, conditions and actions
+you can pick in a plan or in a rule.
+
 **Settings › Rules** (or `rules.json`) — every enabled rule whose conditions match runs, top to bottom. A rule can
-be limited to some topics and can skip the topic's own notification/popup. **Settings › Plugins**
-adds conditions and actions from plugins; see [Plugins](#plugins).
+be limited to some topics and either adds its actions to the topic's plan (**Also**) or replaces the plan for that
+message (**Instead**). **Settings › Plugins** adds conditions and actions from plugins; see [Plugins](#plugins).
 
 ## Plugins
 
 Plugins are small JavaScript packages from the [NtfyBar-Plugins](https://github.com/roypadina/NtfyBar-Plugins)
 marketplace, another marketplace you add, or a local folder. These ship with NtfyBar (off until you
-enable them in Settings › Plugins, then use them in a rule):
+enable them in Settings › Plugins, then use them in a rule). Cards (Alert Card, ACK Button, the JSON Fields table,
+Reply Buttons from the marketplace) can be a topic's popup style or a rule action:
 
 | Plugin | What it adds |
 |---|---|

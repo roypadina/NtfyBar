@@ -27,21 +27,32 @@ enum Renderer {
                                      perform: { _ in }, relayout: {})
                 .padding(24))
         case "--render-history":
-            view = AnyView(HistoryView(model: model, engine: model.engine).frame(width: 640, height: 460))
+            view = AnyView(HistoryView(model: model, engine: model.engine).frame(width: 640, height: 460).background(windowBackground))
         case "--render-publish":
             view = AnyView(PublishView(model: model, engine: model.engine, message: "Build logs from tonight's run.",
                                        files: ["build-482.log", "screenshot.png"].map { URL(fileURLWithPath: "/tmp/\($0)") })
-                .frame(width: 500, height: 560))
+                .frame(width: 500, height: 560).background(windowBackground))
         default:
             let tab = ProcessInfo.processInfo.environment["NTFYBAR_RENDER_TAB"] ?? "topics"
+            let topics = model.engine.config.topics
+            let topic = ProcessInfo.processInfo.environment["NTFYBAR_RENDER_TOPIC"].flatMap { l in topics.first { $0.label == l } } ?? topics.first
             if tab == "consent", let pkg = model.engine.pluginPackages.first(where: { $0.manifest != nil }) {
-                view = AnyView(ConsentSheet(request: ConsentRequest(kind: .package(pkg)), onAllow: {}, onCancel: {}))
+                view = AnyView(ConsentSheet(request: ConsentRequest(kind: .package(pkg)), onAllow: {}, onCancel: {}).background(windowBackground))
+            } else if tab == "topics-tall", let t = topic {  // the whole editor, unscrolled
+                view = AnyView(TopicEditor(model: model, engine: model.engine, draft: t, isNew: false, onRemove: {}) { _ in }
+                    .frame(width: 680, height: 1700).background(windowBackground))
+            } else if tab == "rules-tall", let r = model.engine.rules.rules.first {
+                view = AnyView(RuleEditor(engine: model.engine, draft: r, onRemove: {}) { _ in }.frame(width: 680, height: 1400)
+                    .background(windowBackground))
             } else {
-                view = AnyView(SettingsView(model: model, engine: model.engine, initialTab: tab))
+                view = AnyView(SettingsView(model: model, engine: model.engine, initialTab: tab).background(windowBackground))
             }
         }
         return write(view, to: url)
     }
+
+    /// A real window paints this behind the tab strip and non-form areas; offscreen they'd be transparent.
+    private static let windowBackground = Color(nsColor: .windowBackgroundColor)
 
     private static func write(_ root: AnyView, to url: URL) -> Bool {
         let host = NSHostingView(rootView: root)
@@ -94,10 +105,10 @@ enum DemoData {
         let selfHosted = ServerConfig(url: "https://ntfy.example.com", auth: .token("tk_demo"))
         c.servers.append(selfHosted)
         var b = TopicConfig(id: builds, serverId: c.servers[0].id, topic: "ntfybar-9f3a1c7b2e", label: "CI builds")
-        b.popup.enabled = true
+        b.alerts = bands(.both, ["5": (0, "Basso"), "4": (0, "Basso")])
         b.command = CommandSettings(command: "say \"$NTFY_TITLE\"")
         var h = TopicConfig(id: home, serverId: selfHosted.id, topic: "ntfybar-4c81d0e6a2", label: "Home server")
-        h.popup.enabled = true
+        h.alerts = TopicConfig.defaultAlerts.mapValues { _ in AlertBand(show: .popup, timeoutSec: 0, sound: "Sosumi") }
         h.popup.level = .overFullScreen
         let k = TopicConfig(id: backups, serverId: c.servers[0].id, topic: "ntfybar-7b3e95f0c1", label: "Backups")
         c.topics = [b, h, k]
@@ -105,10 +116,6 @@ enum DemoData {
         c.publish.lastTopicId = home
         try store.saveConfig(c)
         try store.saveRules(RulesFile(rules: [
-            Rule(name: "Urgent home alerts stay on screen", topicIds: [home],
-                 conditions: [RuleStep("builtin.priority", ["op": .string(">="), "value": .number(5)])],
-                 actions: [RuleStep("builtin.popup", ["timeoutSec": .number(0), "level": .string("overFullScreen")]),
-                           RuleStep("builtin.playSound", ["name": .string("Sosumi")])]),
             Rule(name: "Copy deploy URLs", topicIds: [builds],
                  conditions: [RuleStep("builtin.titleContains", ["needle": .string("deployed")]), RuleStep("builtin.hasClick")],
                  actions: [RuleStep("builtin.copy", ["what": .string("click")])])
@@ -122,6 +129,14 @@ enum DemoData {
             history.insert(Message(topicId: m.topic, ntfy: n, receivedAt: Date(timeIntervalSince1970: TimeInterval(n.time)),
                                    isCatchUp: i == 3, read: i > 1, raw: raw))
         }
+    }
+
+    /// Five bands showing `show` (20 s, no sound), with per-priority (timeout, sound) overrides.
+    private static func bands(_ show: AlertBand.Show, _ overrides: [String: (Int, String)]) -> [String: AlertBand] {
+        Dictionary(uniqueKeysWithValues: TopicConfig.priorities.map { p in
+            let o = overrides[String(p)]
+            return (String(p), AlertBand(show: show, timeoutSec: o?.0 ?? 20, sound: o?.1))
+        })
     }
 
     private static var messages: [(topic: UUID, title: String, body: String, priority: Int, tags: [String], click: String?)] {
@@ -142,8 +157,7 @@ enum DemoData {
                                       NtfyAction(action: "http", label: "Start cleanup", url: "https://example.com/api/cleanup", clear: true)],
                             contentType: "text/markdown")
         let m = Message(topicId: home, ntfy: n, receivedAt: Date(), isCatchUp: false, raw: "{}")
-        var s = engine.config.topic(home)?.popup ?? PopupSettings()
-        s.enabled = true
+        let s = engine.config.topic(home)?.popup.settings(timeoutSec: 0) ?? PopupSettings()
         return PopupRequest(message: m, label: "Home server", settings: s)
     }
 }

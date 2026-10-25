@@ -30,6 +30,11 @@ final class AppModel {
         guard !started else { return }
         started = true
         notifier.setUp(model: self)
+        if !engine.migrationNotes.isEmpty {
+            let n = engine.migrationNotes.filter { $0.hasPrefix("absorbed rule") }.count  // one such note per absorbed rule
+            notifier.post(NotificationText(title: "NtfyBar 1.4: \(n) rule\(n == 1 ? "" : "s") became topic plans",
+                                           body: "Backups: config.pre-1.4.json, rules.pre-1.4.json"), category: nil)
+        }
         engine.onEffects = { [weak self] in self?.performer.perform($0) }
         engine.onCopy = { [weak self] in self?.performer.copy($0) }
         engine.onOpen = { [weak self] in self?.performer.open($0.absoluteString) }
@@ -60,7 +65,7 @@ final class AppModel {
 
     func showRecent(_ m: Message) {
         engine.markRead(m)
-        let settings = engine.config.topic(m.topicId)?.popup ?? PopupSettings()
+        let settings = engine.config.topic(m.topicId).map { $0.popup.settings(timeoutSec: $0.band(m.priority).timeoutSec) } ?? PopupSettings()
         performer.showPopup(PopupRequest(message: m, label: label(for: m.topicId), settings: settings), playSound: false)
     }
 
@@ -134,7 +139,7 @@ final class AppModel {
             guard let topicId = c.topicId, let messageId = c.messageId else { PopupPanel.dismiss(state); return }
             let req = PluginPopupRequest(pluginId: ref.pluginId, pluginName: engine.pluginName(ref.pluginId), spec: spec,
                                          topicId: topicId, messageId: messageId, label: label(for: topicId),
-                                         defaults: engine.config.topic(topicId)?.popup ?? PopupSettings())
+                                         defaults: engine.config.topic(topicId)?.popup.settings(timeoutSec: 0) ?? PopupSettings())
             var next = req.content
             next.key = c.key
             state.content = next

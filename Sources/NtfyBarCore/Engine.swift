@@ -14,6 +14,8 @@ public final class Engine {
 
     public private(set) var rules: RulesFile
     public private(set) var pluginPackages: [PluginManager.Package] = []
+    /// What the 1.4 migration changed at this launch (empty = nothing, or no migration).
+    public private(set) var migrationNotes: [String] = []
 
     @ObservationIgnored public let store: ConfigStore
     @ObservationIgnored public let history: HistoryStore
@@ -64,7 +66,39 @@ public final class Engine {
         plugins = PluginManager(bundledDirectory: bundledPlugins, installedDirectory: store.pluginsDirectory, appVersion: appVersion,
                                 registry: dispatcher.rules.registry, host: self)
         reloadPlugins()
+        if config.schemaVersion < 2 { migrateToV2() }
         refreshCounters()
+    }
+
+    /// One-time fold of priority-band rules into topic plans; backups only when something moved.
+    /// A failed write keeps the migrated state in memory and retries at the next launch.
+    private func migrateToV2() {
+        let cardProviders = Set(pluginPackages.filter { $0.state == .active }.flatMap { p -> [String] in
+            guard let m = p.manifest, m.popup != nil else { return [] }
+            return m.providers.filter { $0.kind == "action" }.map(\.id)
+        })
+        var out = Migration.toV2(config: config, rules: rules, cardProviders: cardProviders)
+        out.config.schemaVersion = 2
+        config = out.config
+        rules = out.rules
+        dispatcher.rules.rules = out.rules.rules
+        do {
+            if !out.notes.isEmpty {
+                try store.backup(store.configURL)
+                try store.backup(store.rulesURL)
+            }
+            // Config first: if the rules write fails, the old rules still skip the new plans, so behaviour is unchanged.
+            try store.saveConfig(out.config)
+            if !out.notes.isEmpty { try store.saveRules(out.rules) }
+        } catch {
+            config.schemaVersion = 1
+            Log.config.error("1.4 migration not saved, retried next launch: \(error.localizedDescription, privacy: .public)")
+            return
+        }
+        lastConfigData = try? Data(contentsOf: store.configURL)
+        lastRulesData = try? Data(contentsOf: store.rulesURL)
+        migrationNotes = out.notes
+        for note in out.notes { Log.config.info("1.4 migration: \(note, privacy: .public)") }
     }
 
     public static func makeSession() -> URLSession {

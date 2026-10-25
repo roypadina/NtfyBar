@@ -11,7 +11,7 @@ struct DispatcherTests {
 
     init() {
         var t = TopicConfig(id: topicId, serverId: config.servers[0].id, topic: "ntfybar-9f3a1c7b2e", label: "Builds")
-        t.popup.enabled = true
+        t.alerts = AlertBand.expand(notify: true, popup: { var p = PopupSettings(); p.enabled = true; return p }(), soundOverride: nil)
         config.topics = [t]
     }
 
@@ -43,6 +43,57 @@ struct DispatcherTests {
         let effects = d.handle(makeMessage(topicId: topicId, priority: 5), config: c, now: now)
         #expect(kinds(effects) == ["notify", "popup", "sound", "copy", "command"])
         #expect(effects.contains(.playSound("Basso")))
+    }
+
+    @Test func bandDecidesPopupTimeoutAndSound() {
+        var c = config
+        c.topics[0].alerts["5"] = AlertBand(show: .popup, timeoutSec: 0, sound: "Basso")
+        c.topics[0].alerts["3"] = AlertBand(show: .popup, timeoutSec: 10)
+        let urgent = Dispatcher().handle(makeMessage(topicId: topicId, priority: 5), config: c, now: now)
+        #expect(kinds(urgent) == ["popup", "sound"])
+        if case let .popup(req) = urgent[0] { #expect(req.settings.timeoutSec == 0) } else { Issue.record("no popup") }
+        #expect(urgent.contains(.playSound("Basso")))
+        let normal = Dispatcher().handle(makeMessage(topicId: topicId, priority: 3), config: c, now: now)
+        #expect(kinds(normal) == ["popup"])
+        if case let .popup(req) = normal[0] { #expect(req.settings.timeoutSec == 10) } else { Issue.record("no popup") }
+    }
+
+    @Test func bandNothingRunsNoAlertButStillCopies() {
+        var c = config
+        c.topics[0].alerts["2"] = AlertBand(show: .nothing)
+        c.topics[0].copyToClipboard = true
+        #expect(kinds(Dispatcher().handle(makeMessage(topicId: topicId, priority: 2), config: c, now: now)) == ["copy"])
+    }
+
+    @Test func cardRunsThePluginActionInsteadOfThePopup() {
+        var c = config
+        c.topics[0].popup.card = PluginCard(providerId: "com.example.card.show")
+        c.topics[0].alerts["5"] = AlertBand(show: .both, timeoutSec: 0, sound: "Basso")
+        let m = makeMessage(topicId: topicId, priority: 5)
+        #expect(kinds(Dispatcher(rules: RuleEngine(registry: cardRegistry())).handle(m, config: c, now: now)) == ["notify", "pluginPopup", "sound"])
+        #expect(kinds(Dispatcher(rules: RuleEngine(registry: cardRegistry(throwing: true))).handle(m, config: c, now: now)) == ["notify", "sound"],
+                "a broken card shows no popup and changes nothing else")
+    }
+
+    @Test func ruleInsteadSkipsThePlanAndAlsoAddsToIt() {
+        let hit = [RuleStep("builtin.titleContains", ["needle": .string("x")])]
+        let copy = [RuleStep("builtin.copy", ["what": .string("title")])]
+        let m = makeMessage(topicId: topicId, title: "x")
+        let instead = Dispatcher(rules: RuleEngine(rules: [Rule(name: "i", conditions: hit, actions: copy, skipTopicDefaults: true)]))
+        #expect(kinds(instead.handle(m, config: config, now: now)) == ["copy"])
+        let also = Dispatcher(rules: RuleEngine(rules: [Rule(name: "a", conditions: hit, actions: copy)]))
+        #expect(kinds(also.handle(m, config: config, now: now)) == ["notify", "popup", "copy"])
+    }
+
+    @Test func catchUpSummaryUnlessEveryBandShowsNothing() {
+        var c = config
+        for k in c.topics[0].alerts.keys { c.topics[0].alerts[k]?.show = .nothing }
+        let d = Dispatcher()
+        _ = d.handle(makeMessage(topicId: topicId, isCatchUp: true), config: c, now: now)
+        #expect(d.flushCatchUp(config: c, now: now).isEmpty)
+        c.topics[0].alerts["1"]?.show = .popup
+        _ = d.handle(makeMessage(topicId: topicId, isCatchUp: true), config: c, now: now)
+        #expect(d.flushCatchUp(config: c, now: now) == [.summaryNotification(topicId: topicId, label: "Builds", count: 1)])
     }
 
     @Test func unknownTopicDoesNothing() {

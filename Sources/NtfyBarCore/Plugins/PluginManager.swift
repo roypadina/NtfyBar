@@ -222,7 +222,7 @@ public final class PluginManager {
                     guard let spec = try runtime.action(function, ctx: ctx, params: params) else { return ActionOutput() }
                     return ActionOutput([.pluginPopup(PluginPopupRequest(pluginId: pluginId, pluginName: name, spec: spec,
                                                                          topicId: ctx.topic.id, messageId: ctx.message.ntfy.id,
-                                                                         label: ctx.label, defaults: ctx.topic.popup))])
+                                                                         label: ctx.label, defaults: ctx.topic.popup.settings(timeoutSec: 0)))])
                 }
             }
         }
