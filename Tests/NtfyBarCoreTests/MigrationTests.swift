@@ -155,6 +155,13 @@ struct MigrationTests {
         }
         #expect(t("Clipboard") == f.config.topic(f.ids["Clipboard"]!)!)
         for label in ["Personal", "Work", "Meetings", "Agents"] { #expect(t(label) == f.config.topic(f.ids[label]!)!) }
+
+        // How the editor shows each: one plan, a plan plus important messages, or the five-row table.
+        for label in ["NAS", "Monitoring"] { #expect(t(label).planShape == .important(minPriority: 4), "\(label)") }
+        #expect(t("GitHub").planShape == .important(minPriority: 5))
+        for o in out.config.topics where o.label.hasPrefix("Old") { #expect(o.planShape == .same) }
+        for label in ["Public", "Clipboard", "Meetings", "Agents"] { #expect(t(label).planShape == .same, "\(label)") }
+        for label in ["Personal", "Work"] { #expect(t(label).planShape == .custom, "\(label)") }
     }
 
     @Test func runtimeEquivalence() {

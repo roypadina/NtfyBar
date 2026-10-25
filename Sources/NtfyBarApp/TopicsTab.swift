@@ -59,25 +59,27 @@ struct TopicsTab: View {
         selection = engine.config.topics.first?.id
     }
 
-    /// The Default band's plan, plus markers — e.g. "Popup 10 s · by priority · 1 rule".
+    /// The Default band's plan, plus the important one or markers — e.g. "Popup 10 s · high and up: Popup, stays · 1 rule".
     private func planSummary(_ t: TopicConfig) -> String {
-        let b = t.band(3)
-        let popup = t.popup.card.map { cardName($0, engine) } ?? (b.timeoutSec == 0 ? "Popup, stays" : "Popup \(durationLabel(b.timeoutSec))")
-        var s = switch b.show {
-        case .nothing: "Nothing"
-        case .notification: "Notification"
-        case .popup: popup
-        case .both: t.popup.card == nil ? "Notification + popup" : popup + " + notification"
+        func plan(_ b: AlertBand) -> String {
+            let popup = t.popup.card.map { cardName($0, engine) } ?? (b.timeoutSec == 0 ? "Popup, stays" : "Popup \(durationLabel(b.timeoutSec))")
+            return switch b.show {
+            case .nothing: "Nothing"
+            case .notification: "Notification"
+            case .popup: popup
+            case .both: t.popup.card == nil ? "Notification + popup" : popup + " + notification"
+            }
         }
-        if t.bandsDiffer { s += " · by priority" }
+        var s = switch t.planShape {
+        case .same: plan(t.band(3))
+        case .important(minPriority: 4): "\(plan(t.band(3))) · high and up: \(plan(t.band(5)))"
+        case .important: "\(plan(t.band(3))) · urgent: \(plan(t.band(5)))"
+        case .custom: "\(plan(t.band(3))) · by priority"
+        }
         let n = rulesTouching(t.id, engine).count
         if n > 0 { s += " · \(n) rule\(n == 1 ? "" : "s")" }
         return s
     }
-}
-
-extension TopicConfig {
-    fileprivate var bandsDiffer: Bool { alerts.values.contains { $0 != band(3) } }
 }
 
 /// "Stays", "10 s", "2 min".
@@ -107,7 +109,8 @@ struct TopicEditor: View {
     @State private var error: String?
     @State private var status: String?
     @State private var commandOn = false
-    @State private var sameForAll = false
+    @State private var mode = TopicConfig.PlanShape.same
+    @State private var confirmSimplify = false
 
     private static let timeouts = [0, 5, 10, 15, 20, 30, 60, 120, 300]
     private static let sounds = ["Basso", "Blow", "Bottle", "Frog", "Funk", "Glass", "Hero", "Morse", "Ping", "Pop", "Purr", "Sosumi",
@@ -137,16 +140,37 @@ struct TopicEditor: View {
                     FormFooter("Anyone who knows a topic name on a public server can read and send to it. Pick a long random one — and keep it out of screenshots.")
                 }
 
-                Section {
-                    Toggle("Same for every priority", isOn: Binding(get: { sameForAll }, set: { on in
-                        sameForAll = on
-                        if on { setBand(3, draft.band(3)) }  // copies the Default row to all five
-                    }))
-                    ForEach(sameForAll ? [3] : TopicConfig.priorities, id: \.self) { p in bandRow(p) }
-                } header: {
-                    Text("When a message arrives")
-                } footer: {
-                    FormFooter("Priority is set by the sender (1 min … 5 urgent). A popup stays until dismissed when Close after is Stays. Sounds are macOS system sounds; a notification without a sound here keeps the system notification sound.")
+                if mode == .custom {
+                    Section {
+                        LabeledContent("Custom per priority") { Button("Use simple settings…") { confirmSimplify = true } }
+                        ForEach(TopicConfig.priorities, id: \.self) { p in bandRow(p) }
+                    } header: {
+                        Text("When a message arrives")
+                    } footer: {
+                        FormFooter("Each priority has its own row (the sender sets it: ntfy header Priority: 1–5). Use simple settings… replaces the rows with one plan plus one for important messages.")
+                    }
+                } else {
+                    Section {
+                        planRows(Binding(get: { draft.band(3) }, set: { setGroup(important: false, $0) }))
+                        Toggle("Handle important messages differently", isOn: importantOn)
+                    } header: {
+                        Text("When a message arrives")
+                    } footer: {
+                        FormFooter("Sounds are macOS system sounds. A notification with no sound here keeps the system notification sound.")
+                    }
+                    if importantOn.wrappedValue {
+                        Section {
+                            Picker("Priority", selection: Binding(get: { threshold }, set: setThreshold)) {
+                                Text("High and urgent (4–5)").tag(4)
+                                Text("Urgent only (5)").tag(5)
+                            }
+                            planRows(Binding(get: { draft.band(5) }, set: { setGroup(important: true, $0) }))
+                        } header: {
+                            Text("Important messages")
+                        } footer: {
+                            FormFooter("The sender sets the priority (ntfy header Priority: 1–5). For important messages these rows replace the ones above.")
+                        }
+                    }
                 }
 
                 if draft.popsUpSomewhere {
@@ -252,11 +276,17 @@ struct TopicEditor: View {
         }
         .onAppear {
             commandOn = draft.command != nil
-            sameForAll = !draft.bandsDiffer
+            mode = draft.planShape
         }
         .onChange(of: commandOn) { _, on in
             if on && draft.command == nil { draft.command = CommandSettings(command: "") }
             if !on { draft.command = nil }
+        }
+        .alert("Replace the five rows?", isPresented: $confirmSimplify) {
+            Button("Replace") { setThreshold(4) }
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text("Priorities 3, 2 and 1 will use the Default row; 5 and 4 will use the Urgent row. Nothing is saved until you click Save.")
         }
     }
 
@@ -264,50 +294,80 @@ struct TopicEditor: View {
         Binding(get: { draft.command?.command ?? "" }, set: { draft.command?.command = $0 })
     }
 
-    /// One plan row: what you see, when a popup closes, which sound. Under "Same for every priority" it is
-    /// the Default band, written to all five.
+    /// The first important priority; 6 while the switch is off, so every band is "base".
+    private var threshold: Int { if case let .important(t) = mode { t } else { 6 } }
+
+    private var importantOn: Binding<Bool> {
+        Binding(get: { if case .important = mode { true } else { false } }, set: { on in
+            if on {
+                mode = .important(minPriority: 4)
+                // The 1.3 urgent default, as one group: stays, Basso unless the plan already has a sound.
+                var b = draft.band(3)
+                b.timeoutSec = 0
+                b.sound = b.sound ?? "Basso"
+                setGroup(important: true, b)
+            } else {
+                mode = .same
+                setGroup(important: false, draft.band(3))
+            }
+        })
+    }
+
+    /// Also "Use simple settings…" (4): the Default row for the bands below, the Urgent row from there up.
+    private func setThreshold(_ t: Int) {
+        mode = .important(minPriority: t)
+        setGroup(important: false, draft.band(3))
+        setGroup(important: true, draft.band(5))
+    }
+
+    private func setGroup(important: Bool, _ b: AlertBand) {
+        for p in 1...5 where (p >= threshold) == important { draft.alerts[String(p)] = b }
+    }
+
+    /// Show, Close the popup after, Sound — for the base plan or the important one.
+    @ViewBuilder
+    private func planRows(_ band: Binding<AlertBand>) -> some View {
+        Picker("Show", selection: band.show) { showItems }
+        if band.wrappedValue.showsPopup && draft.popup.card == nil {  // a card decides its own timing
+            Picker("Close the popup after", selection: band.timeoutSec) { timeoutItems(band.wrappedValue.timeoutSec) }
+        }
+        Picker("Sound", selection: band.sound) { soundItems(band.wrappedValue.sound) }
+    }
+
+    @ViewBuilder
+    private var showItems: some View {
+        Text("Nothing").tag(AlertBand.Show.nothing)
+        Text("A macOS notification").tag(AlertBand.Show.notification)
+        Text("NtfyBar's popup").tag(AlertBand.Show.popup)
+        Text("Notification and popup").tag(AlertBand.Show.both)
+    }
+
+    private func timeoutItems(_ current: Int) -> some View {
+        ForEach(Self.timeouts.contains(current) ? Self.timeouts : Self.timeouts + [current], id: \.self) { Text(durationLabel($0)).tag($0) }
+    }
+
+    @ViewBuilder
+    private func soundItems(_ current: String?) -> some View {
+        Text("None").tag(String?.none)
+        if let current, !Self.sounds.contains(current) { Text(current).tag(String?.some(current)) }
+        ForEach(Self.sounds, id: \.self) { Text($0).tag(String?.some($0)) }
+    }
+
+    /// One row of the Custom per priority table: what you see, when a popup closes, which sound.
     private func bandRow(_ p: Int) -> some View {
-        let band = Binding(get: { draft.band(p) }, set: { setBand(p, $0) })
-        let word = sameForAll ? "Any priority" : "\(PopupContent.priorityInfo(p).word) · \(p)"
-        let timeouts = Self.timeouts.contains(band.wrappedValue.timeoutSec) ? Self.timeouts : Self.timeouts + [band.wrappedValue.timeoutSec]
-        let sound = band.wrappedValue.sound
-        return LabeledContent(word) {
+        let band = Binding(get: { draft.band(p) }, set: { draft.alerts[String(p)] = $0 })
+        return LabeledContent("\(PopupContent.priorityInfo(p).word) · \(p)") {
             HStack(spacing: 8) {
-                Picker("Show", selection: Binding(get: { band.wrappedValue.show }, set: { show in
-                    var b = band.wrappedValue
-                    // Switching to a popup gives the familiar 1.3 defaults: urgent stays, Basso / Glass for urgent / high.
-                    if !b.showsPopup, show == .popup || show == .both, b.sound == nil {
-                        b.sound = ["5": "Basso", "4": "Glass"][String(p)]
-                        b.timeoutSec = p == 5 ? 0 : 20
-                    }
-                    b.show = show
-                    band.wrappedValue = b
-                })) {
-                    Text("Nothing").tag(AlertBand.Show.nothing)
-                    Text("Notification").tag(AlertBand.Show.notification)
-                    Text("Popup").tag(AlertBand.Show.popup)
-                    Text("Notification + popup").tag(AlertBand.Show.both)
-                }
-                .labelsHidden().frame(width: 190, alignment: .trailing)
-                Picker("Close after", selection: band.timeoutSec) {
-                    ForEach(timeouts, id: \.self) { Text(durationLabel($0)).tag($0) }
-                }
-                .labelsHidden().frame(width: 110, alignment: .trailing)
-                .disabled(!band.wrappedValue.showsPopup || draft.popup.card != nil)  // a card decides its own timing
-                Picker("Sound", selection: band.sound) {
-                    Text("None").tag(String?.none)
-                    if let sound, !Self.sounds.contains(sound) { Text(sound).tag(String?.some(sound)) }
-                    ForEach(Self.sounds, id: \.self) { Text($0).tag(String?.some($0)) }
-                }
-                .labelsHidden().frame(width: 120, alignment: .trailing)
-                .disabled(band.wrappedValue.show == .nothing)
+                Picker("Show", selection: band.show) { showItems }
+                    .labelsHidden().frame(width: 190, alignment: .trailing)
+                Picker("Close after", selection: band.timeoutSec) { timeoutItems(band.wrappedValue.timeoutSec) }
+                    .labelsHidden().frame(width: 110, alignment: .trailing)
+                    .disabled(!band.wrappedValue.showsPopup || draft.popup.card != nil)  // a card decides its own timing
+                Picker("Sound", selection: band.sound) { soundItems(band.wrappedValue.sound) }
+                    .labelsHidden().frame(width: 120, alignment: .trailing)
             }
         }
         .help("Priority as the sender set it (ntfy header Priority: 1–5).")
-    }
-
-    private func setBand(_ p: Int, _ band: AlertBand) {
-        for k in sameForAll ? TopicConfig.priorities : [p] { draft.alerts[String(k)] = band }
     }
 
     /// Plugin cards on offer: actions of active plugins that declare a popup.

@@ -151,6 +151,8 @@ public struct AlertBand: Codable, Equatable, Sendable {
 
     public var showsNotification: Bool { show == .notification || show == .both }
     public var showsPopup: Bool { show == .popup || show == .both }
+    /// What the runtime reads for this `show`: the timeout only with a popup. Sound always plays.
+    public var effective: AlertBand { AlertBand(show: show, timeoutSec: showsPopup ? timeoutSec : 0, sound: sound) }
 
     /// The 1.3 topic toggles as five bands — exactly what the 1.3 Dispatcher did per priority.
     public static func expand(notify: Bool, popup: PopupSettings, soundOverride: String?) -> [String: AlertBand] {
@@ -323,6 +325,20 @@ public struct TopicConfig: Codable, Equatable, Identifiable, Sendable {
     /// A catch-up summary notification is posted when any band notifies.
     public var notifiesSomewhere: Bool { alerts.values.contains(where: \.showsNotification) }
     public var popsUpSomewhere: Bool { alerts.values.contains(where: \.showsPopup) }
+
+    public enum PlanShape: Equatable, Sendable { case same, important(minPriority: Int), custom }
+    public static let importantThresholds = [4, 5]
+
+    /// How the five bands read: one plan, one plan plus one for priority ≥ 4 or ≥ 5, or anything else.
+    public var planShape: PlanShape {
+        let e = (1...5).map { band($0).effective }  // e[p - 1]
+        if e.allSatisfy({ $0 == e[0] }) { return .same }
+        for t in Self.importantThresholds
+        where e[(t - 1)...].allSatisfy({ $0 == e[4] }) && e[..<(t - 1)].allSatisfy({ $0 == e[0] }) {
+            return .important(minPriority: t)
+        }
+        return .custom
+    }
 
     /// ntfy topic names: a comma would subscribe a second topic, `/` or `?` would inject into the URL path.
     public static func isValidTopicName(_ name: String) -> Bool {

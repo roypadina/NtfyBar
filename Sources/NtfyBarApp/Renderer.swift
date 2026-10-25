@@ -34,11 +34,13 @@ enum Renderer {
                 .frame(width: 500, height: 560).background(windowBackground))
         default:
             let tab = ProcessInfo.processInfo.environment["NTFYBAR_RENDER_TAB"] ?? "topics"
+            let topics = model.engine.config.topics
+            let topic = ProcessInfo.processInfo.environment["NTFYBAR_RENDER_TOPIC"].flatMap { l in topics.first { $0.label == l } } ?? topics.first
             if tab == "consent", let pkg = model.engine.pluginPackages.first(where: { $0.manifest != nil }) {
                 view = AnyView(ConsentSheet(request: ConsentRequest(kind: .package(pkg)), onAllow: {}, onCancel: {}).background(windowBackground))
-            } else if tab == "topics-tall", let t = model.engine.config.topics.first {  // the whole editor, unscrolled
+            } else if tab == "topics-tall", let t = topic {  // the whole editor, unscrolled
                 view = AnyView(TopicEditor(model: model, engine: model.engine, draft: t, isNew: false, onRemove: {}) { _ in }
-                    .frame(width: 680, height: 1400).background(windowBackground))
+                    .frame(width: 680, height: 1700).background(windowBackground))
             } else if tab == "rules-tall", let r = model.engine.rules.rules.first {
                 view = AnyView(RuleEditor(engine: model.engine, draft: r, onRemove: {}) { _ in }.frame(width: 680, height: 1400)
                     .background(windowBackground))
@@ -103,10 +105,10 @@ enum DemoData {
         let selfHosted = ServerConfig(url: "https://ntfy.example.com", auth: .token("tk_demo"))
         c.servers.append(selfHosted)
         var b = TopicConfig(id: builds, serverId: c.servers[0].id, topic: "ntfybar-9f3a1c7b2e", label: "CI builds")
-        b.alerts = bands(.both, ["5": (0, "Basso"), "4": (20, "Glass")])
+        b.alerts = bands(.both, ["5": (0, "Basso"), "4": (0, "Basso")])
         b.command = CommandSettings(command: "say \"$NTFY_TITLE\"")
         var h = TopicConfig(id: home, serverId: selfHosted.id, topic: "ntfybar-4c81d0e6a2", label: "Home server")
-        h.alerts = bands(.popup, ["5": (0, "Sosumi"), "4": (0, "Glass")])
+        h.alerts = TopicConfig.defaultAlerts.mapValues { _ in AlertBand(show: .popup, timeoutSec: 0, sound: "Sosumi") }
         h.popup.level = .overFullScreen
         let k = TopicConfig(id: backups, serverId: c.servers[0].id, topic: "ntfybar-7b3e95f0c1", label: "Backups")
         c.topics = [b, h, k]

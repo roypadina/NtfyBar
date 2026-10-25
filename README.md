@@ -81,7 +81,8 @@ Move `dist/NtfyBar.app` to `/Applications` and open it from there. More in the
 1. Click the bell in the menu bar → **Settings… › Topics › +**.
 2. Give the topic a label, pick the server and enter the topic name — the same one you use in the
    ntfy phone app or in your scripts. **Random** makes an unguessable one.
-3. Set the plan: for each priority what you see, how long a popup stays, which sound. Then **Save** and
+3. Set the plan: what you see, how long a popup stays and which sound; switch on **Handle important messages
+   differently** for priority 4 and up. Then **Save** and
    **Send Test Message** (it shows on your other devices — NtfyBar ignores its own messages).
 4. Send yourself something:
 

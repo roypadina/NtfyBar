@@ -7,7 +7,7 @@ uses [Semantic Versioning](https://semver.org/).
 ## [1.4.0] - 2026-10-25
 
 ### Added
-- One plan per topic: **Settings › Topics** shows a row per priority (Urgent … Min) with what you see (nothing, notification, popup, both), when a popup closes (Stays, 5 s … 5 min) and which sound plays, plus **Same for every priority**.
+- One plan per topic: **Settings › Topics** shows what you see (nothing, notification, popup, both), when a popup closes (Stays, 5 s … 5 min) and which sound plays — one plan for every priority and, behind one switch (**Handle important messages differently**), a second one for important messages (priority 4 and up, or urgent only); the five-row table appears only for a plan that fits neither, with a one-click way back (**Use simple settings…**).
 - A plugin card (Alert Card, ACK Button, …) can be a topic's popup style, with its parameters in the topic editor.
 - The topic editor lists the rules that also apply to the topic, marked **Also** or **Instead**; the sidebar sums up each topic's plan.
 - Rules say **Also do the actions below** or **Instead of the topic's plan**, and the rule list shows each rule's topics.
@@ -17,7 +17,7 @@ uses [Semantic Versioning](https://semver.org/).
 ### Changed
 - `config.json` topic shape: `alerts` (per priority) and `popup` as a style (`level`, `position`, `showCopy`, `showOpen`, optional `card`). Topics with the 1.3 keys are still read and are rewritten in the new shape on the next save.
 - The first launch of 1.4 folds rules that only set a priority band's popup, sound or notification into the topic plans, once. The previous files are kept as `config.pre-1.4.json` and `rules.pre-1.4.json` and one notification says how many rules moved. Every other rule is kept as it was. To go back to 1.3.1, restore those two files.
-- A rule's **Show popup** without its own timeout uses the priority row's **Close after**; a rule popup with its own timeout no longer stays for urgent messages (1.3 applied the topic's "urgent stays" to it).
+- A rule's **Show popup** without its own timeout uses the topic plan's **Close the popup after** for that priority; a rule popup with its own timeout no longer stays for urgent messages (1.3 applied the topic's "urgent stays" to it).
 - The "N messages while you were away" summary now comes for every topic whose plan shows anything (notification, popup or card), not only for topics with notifications on; a topic set to **Nothing** for every priority stays quiet.
 - Quiet hours are named **Quiet hours for sending** and say that incoming messages are not affected.
 - The rule action `builtin.ignore` is shown as **Skip the topic's plan** (same id).

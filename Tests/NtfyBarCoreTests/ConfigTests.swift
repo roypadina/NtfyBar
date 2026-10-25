@@ -172,6 +172,39 @@ struct ConfigTests {
         #expect(try topic(#"{"notify":true,"soundOverride":"","popup":{"enabled":true}}"#).band(5).sound == nil)
     }
 
+    // MARK: plan shape
+
+    func bands(_ b: (Int) -> AlertBand) -> TopicConfig {
+        var t = TopicConfig(serverId: UUID(), topic: "ntfybar-9f3a1c7b2e", label: "T")
+        for p in 1...5 { t.alerts[String(p)] = b(p) }
+        return t
+    }
+
+    @Test func planShapeIgnoresTimeoutWithoutPopup() throws {
+        let t = try topic(#"{"notify":true}"#)
+        #expect(t.band(5) != t.band(3))  // urgent's timeout 0 is noise without a popup
+        #expect(t.planShape == .same)
+    }
+
+    @Test func planShapeTwoGroups() {
+        let nas = bands { $0 >= 4 ? AlertBand(show: .popup, timeoutSec: 0, sound: "Basso") : AlertBand(show: .popup, timeoutSec: 10) }
+        #expect(nas.planShape == .important(minPriority: 4))
+        let github = bands { $0 == 5 ? AlertBand(show: .popup, timeoutSec: 0) : AlertBand(show: .popup, timeoutSec: 10) }
+        #expect(github.planShape == .important(minPriority: 5))
+    }
+
+    @Test func planShapeCustom() {
+        let pair = bands { AlertBand(show: .popup, timeoutSec: 0, sound: ["5": "Basso", "4": "Glass"][String($0)]) }
+        #expect(pair.planShape == .custom)
+        let fromThree = bands { $0 >= 3 ? AlertBand(show: .popup, timeoutSec: 0) : AlertBand(show: .popup, timeoutSec: 10) }
+        #expect(fromThree.planShape == .custom)
+    }
+
+    @Test func effectiveKeepsSoundForNothing() {
+        #expect(AlertBand(show: .nothing, sound: "Basso").effective.sound == "Basso")
+        #expect(AlertBand(show: .nothing, timeoutSec: 30).effective.timeoutSec == 0)
+    }
+
     @Test func schemaVersionDefaultsToOneWhenAbsent() throws {
         #expect(try JSONDecoder().decode(Config.self, from: Data("{}".utf8)).schemaVersion == 1)
         #expect(Config().schemaVersion == 2)
