@@ -119,10 +119,12 @@ struct TopicEditor: View {
                             Text(ServerConfig.validatedURL(s.url)?.host() ?? s.url).tag(s.id)
                         }
                     }
-                    HStack {
-                        TextField("Topic", text: $draft.topic, prompt: Text("e.g. ntfybar-k3Xq9Lw2…"))
-                            .font(.system(.body, design: .monospaced))
-                        Button("Random") { draft.topic = TopicConfig.randomName() }
+                    LabeledContent("Topic") {
+                        HStack {
+                            TextField("Topic", text: $draft.topic, prompt: Text("e.g. ntfybar-k3Xq9Lw2…")).labelsHidden()
+                                .font(.system(.body, design: .monospaced)).multilineTextAlignment(.trailing)
+                            Button("Random") { draft.topic = TopicConfig.randomName() }
+                        }
                     }
                     Toggle("Enabled", isOn: $draft.enabled)
                 } header: {
@@ -154,7 +156,7 @@ struct TopicEditor: View {
                         }
                         if let card = draft.popup.card {
                             if let d = engine.dispatcher.rules.registry.descriptors[card.providerId] {
-                                ForEach(d.params, id: \.key) { spec in ParamField(spec: spec, params: cardParams, engine: engine) }
+                                ForEach(d.params, id: \.key) { spec in ParamField(spec: spec, params: cardParams, engine: engine, inForm: true) }
                             } else {
                                 Text("Plugin unavailable — its settings are kept.").foregroundStyle(.secondary)
                             }
@@ -193,8 +195,10 @@ struct TopicEditor: View {
                         .disabled(!draft.downloadAttachments)
                     Toggle("Run a command", isOn: $commandOn)
                     if commandOn {
-                        TextField("Command", text: commandBinding, prompt: Text("say \"$NTFY_TITLE\""), axis: .vertical)
-                            .font(.system(.body, design: .monospaced)).lineLimit(1...4)
+                        LabeledContent("Command") {
+                            TextField("Command", text: commandBinding, prompt: Text("say \"$NTFY_TITLE\""), axis: .vertical).labelsHidden()
+                                .font(.system(.body, design: .monospaced)).lineLimit(1...4).frame(maxWidth: .infinity, alignment: .leading)
+                        }
                         Stepper("Time limit \(draft.command?.timeoutSec ?? 30) s", value: Binding(
                             get: { draft.command?.timeoutSec ?? 30 }, set: { draft.command?.timeoutSec = $0 }), in: 1...600)
                         Toggle("Notify me when it fails", isOn: Binding(

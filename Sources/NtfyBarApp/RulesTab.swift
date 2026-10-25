@@ -81,43 +81,47 @@ struct RuleEditor: View {
 
     var body: some View {
         EditorPane {
-            Form {
-                Section("Rule") {
-                    TextField("Name", text: $draft.name)
-                    LabeledContent("Topics") {
-                        VStack(alignment: .leading) {
+            ScrollView {
+                VStack(alignment: .leading, spacing: 16) {
+                    TextField("Rule name", text: $draft.name).textFieldStyle(.roundedBorder)
+                    GroupBox {
+                        LazyVGrid(columns: [GridItem(.adaptive(minimum: 150), alignment: .leading)], alignment: .leading, spacing: 6) {
                             Toggle("Any topic", isOn: Binding(get: { draft.topicIds.isEmpty }, set: { if $0 { draft.topicIds = [] } }))
+                                .toggleStyle(.checkbox)
                             ForEach(engine.config.topics) { t in
                                 Toggle(t.displayLabel, isOn: Binding(
                                     get: { draft.topicIds.contains(t.id) },
                                     set: { on in
                                         if on { draft.topicIds.append(t.id) } else { draft.topicIds.removeAll { $0 == t.id } }
                                     }))
+                                    .toggleStyle(.checkbox)
                             }
                         }
+                        .padding(6)
+                    } label: {
+                        Text("Topics").font(.headline)
                     }
-                    Picker("Run when", selection: $draft.matchMode) {
-                        Text("all conditions match").tag(Rule.MatchMode.all)
-                        Text("any condition matches").tag(Rule.MatchMode.any)
+                    StepList(title: "Conditions", kind: .condition, steps: $draft.conditions, engine: engine, matchMode: $draft.matchMode)
+                    GroupBox {
+                        VStack(alignment: .leading, spacing: 8) {
+                            Picker("Then", selection: $draft.skipTopicDefaults) {
+                                Text("Also do the actions below").tag(false)
+                                Text("Instead of the topic's plan").tag(true)
+                            }
+                            .pickerStyle(.segmented).labelsHidden().fixedSize()
+                            Text(draft.skipTopicDefaults
+                                ? "For matching messages the topic's plan (notification, popup, sound, copy, download, command) is skipped; only the actions below run."
+                                : "The topic's plan runs as usual, plus the actions below.")
+                                .font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
+                        }
+                        .padding(6).frame(maxWidth: .infinity, alignment: .leading)
+                    } label: {
+                        Text("Then").font(.headline)
                     }
+                    StepList(title: "Actions", kind: .action, steps: $draft.actions, engine: engine)
                 }
-                StepList(title: "Conditions", kind: .condition, steps: $draft.conditions, engine: engine)
-                Section {
-                    Picker("", selection: $draft.skipTopicDefaults) {
-                        Text("Also do the actions below").tag(false)
-                        Text("Instead of the topic's plan").tag(true)
-                    }
-                    .pickerStyle(.segmented).labelsHidden()
-                } header: {
-                    Text("Then")
-                } footer: {
-                    FormFooter(draft.skipTopicDefaults
-                        ? "For matching messages the topic's plan (notification, popup, sound, copy, download, command) is skipped; only the actions below run."
-                        : "The topic's plan runs as usual, plus the actions below.")
-                }
-                StepList(title: "Actions", kind: .action, steps: $draft.actions, engine: engine)
+                .padding(20)
             }
-            .formStyle(.grouped)
         } leading: {
             if onRemove != nil { Button("Remove Rule…", role: .destructive) { confirmRemove = true } }
             if let status { Text(status).foregroundStyle(.secondary).lineLimit(1) }
@@ -142,43 +146,80 @@ struct RuleEditor: View {
     }
 }
 
+/// Conditions or actions card (MaccyPlus conditionsBox / actionsBox). Pass `matchMode` for conditions.
 struct StepList: View {
     let title: String
     let kind: ProviderKind
     @Binding var steps: [RuleStep]
     let engine: Engine
+    var matchMode: Binding<Rule.MatchMode>?
 
     var body: some View {
         let catalog = engine.dispatcher.rules.registry.catalog(kind)
-        Section(title) {
-            ForEach($steps) { $step in
-                VStack(alignment: .leading, spacing: 6) {
-                    HStack {
-                        Picker("", selection: $step.providerId) {
-                            if !catalog.contains(where: { $0.id == step.providerId }) {
-                                Text("\(step.providerId) (plugin unavailable)").tag(step.providerId)
-                            }
-                            ForEach(catalog) { d in
-                                Text(d.packageId.map { "\(engine.pluginName($0)) › \(d.name)" } ?? d.name).tag(d.id)
-                            }
-                        }
-                        .labelsHidden()
-                        Button(role: .destructive) { steps.removeAll { $0.id == step.id } } label: { Image(systemName: "trash") }
-                            .buttonStyle(.borderless)
+        GroupBox {
+            VStack(alignment: .leading, spacing: 8) {
+                if let matchMode {
+                    Picker("Match", selection: matchMode) {
+                        Text("Match ALL conditions").tag(Rule.MatchMode.all)
+                        Text("Match ANY condition").tag(Rule.MatchMode.any)
                     }
-                    if let d = catalog.first(where: { $0.id == step.providerId }) {
-                        Text(d.description).font(.caption).foregroundStyle(.secondary)
-                        ForEach(d.params, id: \.key) { spec in ParamField(spec: spec, params: $step.params, engine: engine) }
+                    .pickerStyle(.segmented).labelsHidden().fixedSize()
+                }
+                if steps.isEmpty {
+                    Text(kind == .condition ? "No conditions — this rule never runs. To change what a topic always does, edit its plan in Topics."
+                                            : "No actions yet.")
+                        .foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
+                }
+                ForEach($steps) { $step in
+                    StepRow(step: $step, catalog: catalog, engine: engine) { steps.removeAll { $0.id == step.id } }
+                    if kind == .action && step.id != steps.last?.id { Divider() }
+                }
+                Button { steps.append(RuleStep(catalog.first?.id ?? "")) } label: {
+                    Label(kind == .condition ? "Add condition" : "Add action", systemImage: "plus")
+                }
+                .buttonStyle(.borderless)
+            }
+            .padding(6).frame(maxWidth: .infinity, alignment: .leading)
+        } label: {
+            Text(title).font(.headline)
+        }
+    }
+}
+
+/// Provider picker + ⓘ description popover + trash, params below (MaccyPlus ActionRow: NtfyBar
+/// steps have several labelled params, which don't fit beside the picker).
+struct StepRow: View {
+    @Binding var step: RuleStep
+    let catalog: [ProviderDescriptor]
+    let engine: Engine
+    let onDelete: () -> Void
+    @State private var showHelp = false
+
+    var body: some View {
+        let descriptor = catalog.first { $0.id == step.providerId }
+        VStack(alignment: .leading, spacing: 6) {
+            HStack(spacing: 8) {
+                Picker("", selection: $step.providerId) {
+                    if descriptor == nil {
+                        Text("\(step.providerId) (plugin unavailable)").tag(step.providerId)
+                    }
+                    ForEach(catalog) { d in
+                        Text(d.packageId.map { "\(engine.pluginName($0)) › \(d.name)" } ?? d.name).tag(d.id)
                     }
                 }
-                .padding(.vertical, 2)
+                .labelsHidden().frame(width: 240)
+                .help(descriptor?.description ?? "")
+                if let d = descriptor {
+                    Button { showHelp.toggle() } label: { Image(systemName: "info.circle") }
+                        .buttonStyle(.borderless).foregroundStyle(.secondary)
+                        .accessibilityLabel("Description")
+                        .popover(isPresented: $showHelp) { Text(d.description).padding().frame(maxWidth: 320) }
+                }
+                Spacer(minLength: 0)
+                Button(role: .destructive) { onDelete() } label: { Image(systemName: "trash") }.buttonStyle(.borderless)
             }
-            if steps.isEmpty && kind == .condition {
-                Text("No conditions — this rule never runs. To change what a topic always does, edit its plan in Topics.")
-                    .foregroundStyle(.secondary)
-            }
-            Button("Add \(kind == .condition ? "Condition" : "Action")") {
-                steps.append(RuleStep(catalog.first?.id ?? ""))
+            if let d = descriptor {
+                ForEach(d.params, id: \.key) { ParamField(spec: $0, params: $step.params, engine: engine) }
             }
         }
     }
@@ -188,6 +229,8 @@ struct ParamField: View {
     let spec: ParamSpec
     @Binding var params: Params
     let engine: Engine
+    /// In a grouped Form (a topic's plugin card) rows already show their label and align the value right.
+    var inForm = false
 
     var body: some View {
         switch spec.kind {
@@ -198,19 +241,29 @@ struct ParamField: View {
                 Text("Choose…").tag("")
                 ForEach(engine.config.topics) { t in Text(t.displayLabel).tag(t.id.uuidString) }
             }
+            .fixedSize(horizontal: !inForm, vertical: !inForm)
         case .choice:
             Picker(spec.label, selection: Binding(get: { params.string(spec.key) ?? spec.choices?.first ?? "" },
                                                   set: { params[spec.key] = .string($0) })) {
                 ForEach(spec.choices ?? [], id: \.self) { Text($0).tag($0) }
             }
+            .fixedSize(horizontal: !inForm, vertical: !inForm)
         case .number:
-            TextField(spec.label, text: Binding(
-                get: { params.string(spec.key) ?? "" },
-                set: { params[spec.key] = Double($0).map(JSONValue.number) ?? ($0.isEmpty ? nil : .string($0)) }),
-                prompt: spec.placeholder.map { Text($0) })
+            textRow(Binding(get: { params.string(spec.key) ?? "" },
+                            set: { params[spec.key] = Double($0).map(JSONValue.number) ?? ($0.isEmpty ? nil : .string($0)) }))
         case .text:
-            TextField(spec.label, text: Binding(get: { params.string(spec.key) ?? "" }, set: { params[spec.key] = .string($0) }),
-                      prompt: spec.placeholder.map { Text($0) })
+            textRow(Binding(get: { params.string(spec.key) ?? "" }, set: { params[spec.key] = .string($0) }))
+        }
+    }
+
+    @ViewBuilder private func textRow(_ text: Binding<String>) -> some View {
+        if inForm {
+            TextField(spec.label, text: text, prompt: spec.placeholder.map { Text($0) })
+        } else {
+            // Outside a Form a TextField hides its title, so the label is shown explicitly like the pickers'.
+            LabeledContent(spec.label) {
+                TextField(spec.label, text: text, prompt: spec.placeholder.map { Text($0) }).labelsHidden().textFieldStyle(.roundedBorder)
+            }
         }
     }
 }

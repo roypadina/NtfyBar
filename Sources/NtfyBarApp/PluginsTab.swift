@@ -57,11 +57,16 @@ struct PluginsTab: View {
 
     // MARK: installed
 
-    private var installedView: some View {
+    @ViewBuilder private var installedView: some View {
+        if engine.pluginPackages.isEmpty {
+            EmptyState(icon: "puzzlepiece.extension", title: "No plugins yet", caption: "Browse Available, or add a folder under Sources.")
+        } else {
+            installedList
+        }
+    }
+
+    private var installedList: some View {
         Form {
-            if engine.pluginPackages.isEmpty {
-                Text("No plugins found. Browse Available, or add a folder under Sources.").foregroundStyle(.secondary)
-            }
             ForEach(engine.pluginPackages) { pkg in
                 Section {
                     packageHeader(pkg)
@@ -96,36 +101,37 @@ struct PluginsTab: View {
                     ForEach(pkg.errors, id: \.self) { e in
                         Label(e, systemImage: "exclamationmark.triangle").font(.caption).foregroundStyle(pkg.state == .invalid ? .red : .orange)
                     }
-                    if pkg.source == .installed {
-                        Button("Uninstall", role: .destructive) { try? engine.uninstallPlugin(pkg.id) }
-                    }
                 }
             }
         }
         .formStyle(.grouped)
     }
 
+    /// MaccyPlus PackageGroupView header: name, version, source pill, unverified pill, Uninstall.
     private func packageHeader(_ pkg: PluginManager.Package) -> some View {
-        HStack(alignment: .top) {
-            VStack(alignment: .leading, spacing: 2) {
-                Text(pkg.manifest.map { "\($0.name) \($0.version)" } ?? pkg.id).font(.headline)
-                if let m = pkg.manifest {
-                    Text(m.description).foregroundStyle(.secondary)
-                    if !m.providers.isEmpty {
-                        Text("Adds: " + m.providers.map { p in
-                            "\(p.name) — " + (p.kind == "condition" ? "rule condition" : m.popup != nil ? "popup card for a topic or a rule" : "rule action")
-                        }.joined(separator: " · "))
-                            .font(.caption).foregroundStyle(.secondary).lineLimit(3)
+        VStack(alignment: .leading, spacing: 2) {
+            HStack(spacing: 6) {
+                Text(pkg.manifest?.name ?? pkg.id).fontWeight(.semibold)
+                if let m = pkg.manifest { Text(m.version).foregroundStyle(.secondary) }
+                Pill(sourceName(pkg.source), tint: .accentColor)
+                if !pkg.verified { Pill("Unverified", tint: .orange, icon: "exclamationmark.shield") }
+                Spacer()
+                if pkg.source == .installed {
+                    Button(role: .destructive) { try? engine.uninstallPlugin(pkg.id) } label: {
+                        Label("Uninstall", systemImage: "trash").font(.caption)
                     }
-                    if let author = m.author?.name { Text("by \(author)").font(.caption).foregroundStyle(.secondary) }
+                    .buttonStyle(.borderless)
                 }
             }
-            Spacer()
-            VStack(alignment: .trailing, spacing: 4) {
-                Text(sourceName(pkg.source)).font(.caption).foregroundStyle(.secondary)
-                if !pkg.verified {
-                    Label("Unverified source", systemImage: "exclamationmark.shield").font(.caption).foregroundStyle(.orange)
+            if let m = pkg.manifest {
+                Text(m.description).font(.caption).foregroundStyle(.secondary)
+                if !m.providers.isEmpty {
+                    Text("Adds: " + m.providers.map { p in
+                        "\(p.name) — " + (p.kind == "condition" ? "rule condition" : m.popup != nil ? "popup card for a topic or a rule" : "rule action")
+                    }.joined(separator: " · "))
+                        .font(.caption).foregroundStyle(.secondary).lineLimit(3)
                 }
+                if let author = m.author?.name { Text("by \(author)").font(.caption).foregroundStyle(.secondary) }
             }
         }
     }
@@ -145,34 +151,36 @@ struct PluginsTab: View {
             Section {
                 HStack {
                     Button(busy ? "Loading…" : "Refresh") { refresh() }.disabled(busy)
+                    if busy { ProgressView().controlSize(.small) }
                     if let status { Text(status).foregroundStyle(.secondary).lineLimit(2) }
                 }
             } footer: {
-                Text("NtfyBar only contacts marketplaces when you press Refresh or Install. Every file is checked against its published SHA-256 before anything is written.")
-                    .font(.caption).foregroundStyle(.secondary)
+                FormFooter("NtfyBar only contacts marketplaces when you press Refresh or Install. Every file is checked against its published SHA-256 before anything is written.")
             }
             ForEach(available, id: \.entry.id) { item in
                 Section {
-                    HStack(alignment: .top) {
-                        VStack(alignment: .leading, spacing: 2) {
-                            Text("\(item.entry.name) \(item.entry.version)").font(.headline)
-                            Text(item.entry.description).foregroundStyle(.secondary)
-                            Text(item.entry.permissions.isEmpty ? "No extra permissions" : "Asks for: " + item.entry.permissions.joined(separator: ", "))
-                                .font(.caption).foregroundStyle(.secondary)
-                            Text("From " + (item.source == PluginSettings.officialMarketplace ? "the official marketplace"
-                                                                                               : URL(string: item.source)?.host() ?? item.source))
-                                .font(.caption).foregroundStyle(.secondary)
+                    VStack(alignment: .leading, spacing: 2) {
+                        HStack(alignment: .top, spacing: 6) {
+                            Text(item.entry.name).fontWeight(.medium)
+                            Text(item.entry.version).foregroundStyle(.secondary)
                             if item.source != PluginSettings.officialMarketplace {
-                                Label("Unverified source", systemImage: "exclamationmark.shield").font(.caption).foregroundStyle(.orange)
+                                Pill("Unverified", tint: .orange, icon: "exclamationmark.shield")
+                            }
+                            Spacer()
+                            if let conflict = engine.installConflict(id: item.entry.id, marketplaceURL: item.source) {
+                                Text(conflict).font(.caption).foregroundStyle(.secondary).multilineTextAlignment(.trailing).frame(maxWidth: 200)
+                            } else if installLabel(item.entry) == "Installed" {
+                                Pill("Installed")
+                            } else {
+                                Button(installLabel(item.entry)) { install(item.entry, from: item.source) }.disabled(busy)
                             }
                         }
-                        Spacer()
-                        if let conflict = engine.installConflict(id: item.entry.id, marketplaceURL: item.source) {
-                            Text(conflict).font(.caption).foregroundStyle(.secondary).multilineTextAlignment(.trailing).frame(maxWidth: 200)
-                        } else {
-                            Button(installLabel(item.entry)) { install(item.entry, from: item.source) }
-                                .disabled(busy || installLabel(item.entry) == "Installed")
-                        }
+                        Text(item.entry.description).font(.caption).foregroundStyle(.secondary).lineLimit(2)
+                        Text(item.entry.permissions.isEmpty ? "No extra permissions" : "Asks for: " + item.entry.permissions.joined(separator: ", "))
+                            .font(.caption).foregroundStyle(.secondary)
+                        Text("From " + (item.source == PluginSettings.officialMarketplace ? "the official marketplace"
+                                                                                           : URL(string: item.source)?.host() ?? item.source))
+                            .font(.caption).foregroundStyle(.secondary)
                     }
                 }
             }
@@ -247,9 +255,10 @@ struct PluginsTab: View {
             Section {
                 ForEach(engine.config.plugins.localFolders, id: \.self) { path in
                     HStack {
+                        Image(systemName: "folder").foregroundStyle(.secondary)
                         Text((path as NSString).abbreviatingWithTildeInPath).lineLimit(1).truncationMode(.middle)
                         Spacer()
-                        Button("Remove") { updateFolders { $0.removeAll { $0 == path } } }
+                        removeButton { updateFolders { $0.removeAll { $0 == path } } }
                     }
                 }
                 HStack {
@@ -259,15 +268,16 @@ struct PluginsTab: View {
             } header: {
                 Text("Local folders")
             } footer: {
-                Text("For developing your own plugins: a folder with plugin.json, or a folder of such folders. Local plugins are marked as unverified.")
-                    .font(.caption).foregroundStyle(.secondary)
+                FormFooter("For developing your own plugins: a folder with plugin.json, or a folder of such folders. Local plugins are marked as unverified.")
             }
             Section("Marketplaces") {
                 ForEach(engine.config.plugins.marketplaces, id: \.self) { url in
                     HStack {
+                        Image(systemName: "globe").foregroundStyle(.secondary)
                         Text(url == PluginSettings.officialMarketplace ? "Official (NtfyBar-Plugins)" : url).lineLimit(1).truncationMode(.middle)
+                        if url == PluginSettings.officialMarketplace { Pill("Official", tint: .accentColor) }
                         Spacer()
-                        Button("Remove") { try? engine.update { $0.plugins.marketplaces.removeAll { $0 == url } } }
+                        removeButton { try? engine.update { $0.plugins.marketplaces.removeAll { $0 == url } } }
                     }
                 }
                 HStack {
@@ -281,6 +291,11 @@ struct PluginsTab: View {
             }
         }
         .formStyle(.grouped)
+    }
+
+    private func removeButton(_ action: @escaping () -> Void) -> some View {
+        Button(role: .destructive, action: action) { Image(systemName: "trash") }
+            .buttonStyle(.borderless).foregroundStyle(.secondary).help("Remove").accessibilityLabel("Remove")
     }
 
     private func updateFolders(_ change: (inout [String]) -> Void) {
@@ -308,8 +323,14 @@ struct ConsentSheet: View {
     var body: some View {
         let m = request.manifest
         VStack(alignment: .leading, spacing: 14) {
-            Text("Enable “\(m.name)” \(m.version)?").font(.title3.bold())
-            if let author = m.author?.name { Text("by \(author)").foregroundStyle(.secondary) }
+            HStack(spacing: 10) {
+                Image(systemName: request.verified ? "puzzlepiece.extension.fill" : "exclamationmark.shield.fill").font(.title2)
+                    .foregroundStyle(request.verified ? Color.accentColor : .orange)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("Enable “\(m.name)” \(m.version)?").font(.headline)
+                    if let author = m.author?.name { Text("by \(author)").foregroundStyle(.secondary) }
+                }
+            }
             if !request.verified {
                 Label("Unverified source. Only continue if you trust whoever made this plugin.", systemImage: "exclamationmark.shield")
                     .foregroundStyle(.orange)
@@ -339,8 +360,8 @@ struct ConsentSheet: View {
                 Button("Allow and Enable", action: onAllow).keyboardShortcut(.defaultAction)
             }
         }
-        .padding(22)
-        .frame(width: 480)
+        .padding(20)
+        .frame(width: 460)
     }
 
     private func icon(_ p: Permission) -> String {

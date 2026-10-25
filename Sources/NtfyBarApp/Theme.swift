@@ -26,13 +26,13 @@ enum Theme {
     /// Ink text on the bright dark-mode fills, white on the deep light-mode fills.
     static let onSignal = dyn(light: .white, dark: NSColor(red: 0.05, green: 0.07, blue: 0.13, alpha: 1))
 
-    static let panelRadius: CGFloat = 18  // continuous
+    static let panelRadius: CGFloat = 20  // continuous
     static let rimWidth: CGFloat = 4      // left signal bar
     static let strokeWidth: CGFloat = 1   // hairline edge (2 under Increase Contrast)
 
-    static let title = Font.system(size: 15, weight: .semibold)
+    static let title = Font.system(size: 16, weight: .semibold)
     static let body = Font.system(size: 13)
-    static let meta = Font.system(size: 12)
+    static let meta = Font.system(size: 13)
     static let state = Font.system(size: 12, weight: .semibold, design: .rounded)
     static let button = Font.system(size: 13, weight: .semibold)
 

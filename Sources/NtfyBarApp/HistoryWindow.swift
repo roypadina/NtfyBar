@@ -43,8 +43,8 @@ struct HistoryView: View {
             .padding(10)
             Divider()
             if messages.isEmpty {
-                Text(search.isEmpty ? "No messages yet." : "No matches.").foregroundStyle(.secondary)
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                EmptyState(icon: "tray", title: search.isEmpty ? "No messages yet" : "No matches",
+                           caption: search.isEmpty ? "Messages from your topics will show up here." : "Try a different search or topic.")
             } else {
                 List {
                     ForEach(messages) { m in
@@ -65,6 +65,7 @@ struct HistoryView: View {
                     }
                 }
                 .listStyle(.inset)
+                .alternatingRowBackgrounds()
             }
         }
         .frame(minWidth: 560, minHeight: 400)

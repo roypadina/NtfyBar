@@ -37,7 +37,7 @@ enum PopupPanel {
     }
 
     private static var active: [Entry] = []
-    static let width: CGFloat = 480
+    static let width: CGFloat = 520
     private static let gap: CGFloat = 10
     private static let margin: CGFloat = 12
 
@@ -211,7 +211,7 @@ struct PopupView: View {
             Text(c.title).font(Theme.title).lineLimit(3).fixedSize(horizontal: false, vertical: true)
             ForEach(Array(c.blocks.enumerated()), id: \.offset) { _, block in blockView(block) }
             if !c.tags.isEmpty {
-                Text(c.tags.joined(separator: " · ")).font(Theme.meta).foregroundStyle(.secondary)
+                HStack(spacing: 4) { ForEach(Array(c.tags.enumerated()), id: \.offset) { _, tag in Pill(tag) } }
             }
             if let attachment = c.attachment {
                 if let url = attachment.url {
@@ -222,7 +222,7 @@ struct PopupView: View {
             }
             buttons.padding(.top, 2)
         }
-        .padding(16)
+        .padding(18)
         .padding(.leading, 6)  // clear the signal rim
         .frame(width: PopupPanel.width, alignment: .topLeading)
         .background(background)
@@ -240,7 +240,7 @@ struct PopupView: View {
         HStack(spacing: 6) {
             if let p = c.priority {
                 let info = PopupContent.priorityInfo(p)
-                Label(info.word, systemImage: info.icon).font(Theme.state).foregroundStyle(signal)
+                Label(info.word, systemImage: info.icon).font(Theme.state).imageScale(.medium).foregroundStyle(signal)
             } else {
                 Image(systemName: c.icon).font(Theme.state).foregroundStyle(signal)
             }
@@ -319,7 +319,7 @@ struct PopupView: View {
                 button(b, number: i < 3 ? i + 1 : nil).fixedSize()
             }
             if !overflow.isEmpty {
-                Menu("Other actions") {
+                Menu("More") {
                     ForEach(overflow) { b in Button(b.label) { perform(b) } }
                 }
                 .menuStyle(.button)
@@ -398,8 +398,8 @@ struct PopupButtonStyle: ButtonStyle {
             cfg.label
                 .font(Theme.button)
                 .lineLimit(1)
-                .padding(.horizontal, 10)
-                .frame(height: 28)
+                .padding(.horizontal, 14)
+                .frame(height: 32)
                 .foregroundStyle(prominent ? AnyShapeStyle(Theme.onSignal) : AnyShapeStyle(.primary))
                 .background(
                     Capsule()

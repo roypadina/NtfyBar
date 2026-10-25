@@ -19,6 +19,7 @@ uses [Semantic Versioning](https://semver.org/).
 - The first launch of 1.4 folds rules that only set a priority band's popup, sound or notification into the topic plans, once. The previous files are kept as `config.pre-1.4.json` and `rules.pre-1.4.json` and one notification says how many rules moved. Every other rule is kept as it was. To go back to 1.3.1, restore those two files.
 - Quiet hours are named **Quiet hours for sending** and say that incoming messages are not affected.
 - The rule action `builtin.ignore` is shown as **Skip the topic's plan** (same id).
+- Settings and the popup follow the house style of the other Mac apps: sidebars with status dots and a caption (sign-in kind for servers), Save and Remove pinned below every editor, rule conditions and actions as cards (Match ALL / ANY, ⓘ for each step's description, topics as a checkbox grid), plugin source and "Unverified" pills, a centred About tab with the version, **Pause notifications** as one menu, quiet-hours times that save as soon as both are valid. The popup is 520 pt wide with larger title and buttons, tags as pills and a **More** menu; History has alternating rows.
 
 ### Removed
 - `notify`, `soundOverride` and `popup.enabled` / `timeoutSec` / `stickyForUrgent` / `soundByPriority` are no longer written to new config files (they are still read).
