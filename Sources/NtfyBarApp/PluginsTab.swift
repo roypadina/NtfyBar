@@ -40,6 +40,10 @@ struct PluginsTab: View {
                 Text("Sources").tag("sources")
             }
             .pickerStyle(.segmented).labelsHidden().padding(.horizontal, 20).padding(.top, 12)
+            if section == "installed" {
+                FormFooter("Cards appear in a topic's Popup › Style; conditions and actions appear in a rule's pickers — after you enable the plugin.")
+                    .padding(.horizontal, 20).padding(.top, 8)
+            }
             switch section {
             case "available": availableView
             case "sources": sourcesView
@@ -107,6 +111,12 @@ struct PluginsTab: View {
                 Text(pkg.manifest.map { "\($0.name) \($0.version)" } ?? pkg.id).font(.headline)
                 if let m = pkg.manifest {
                     Text(m.description).foregroundStyle(.secondary)
+                    if !m.providers.isEmpty {
+                        Text("Adds: " + m.providers.map { p in
+                            "\(p.name) — " + (p.kind == "condition" ? "rule condition" : m.popup != nil ? "popup card for a topic or a rule" : "rule action")
+                        }.joined(separator: " · "))
+                            .font(.caption).foregroundStyle(.secondary).lineLimit(3)
+                    }
                     if let author = m.author?.name { Text("by \(author)").font(.caption).foregroundStyle(.secondary) }
                 }
             }

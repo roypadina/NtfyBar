@@ -89,10 +89,9 @@ struct GeneralTab: View {
                     ForEach(1...5, id: \.self) { p in Text(PopupContent.priorityInfo(p).word).tag(p) }
                 }
             } header: {
-                Text("Quiet hours")
+                Text("Quiet hours for sending")
             } footer: {
-                Text("Applies to everything NtfyBar publishes — rules, plugins and test messages — so nobody's phone rings at night. Times are 24-hour HH:MM.")
-                    .font(.caption).foregroundStyle(.secondary)
+                FormFooter("Only for messages NtfyBar sends — rules, plugins, Publish and test messages — so nobody's phone rings at night. Incoming messages are not affected: use Pause, or give the topic a quieter plan. Times are 24-hour HH:MM.")
             }
             Section("Files") {
                 HStack {
