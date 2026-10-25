@@ -55,7 +55,7 @@ public final class Dispatcher {
             return []
         }
         let outcome = rules.evaluate(m, topic: topic, config: config)
-        var effects = outcome.skipTopicDefaults ? [] : topicDefaults(m, topic: topic)
+        var effects = outcome.skipTopicDefaults ? [] : plan(m, topic: topic, config: config)
         effects += outcome.effects
 
         // Flood guard (live or processMissed messages only — plain catch-up returned above): during a
@@ -83,12 +83,23 @@ public final class Dispatcher {
 
     public var hasPendingCatchUp: Bool { !catchUpCounts.isEmpty }
 
-    private func topicDefaults(_ m: Message, topic: TopicConfig) -> [Effect] {
+    /// The topic's plan for one message (its priority's band, then the topic-level extras). No rules,
+    /// no flood or pause handling, no counters.
+    public func plan(_ m: Message, topic: TopicConfig, config: Config) -> [Effect] {
         var effects: [Effect] = []
         let band = topic.band(m.priority)
         if band.showsNotification { effects.append(.notify(m, label: topic.displayLabel)) }
         if band.showsPopup {
-            effects.append(.popup(PopupRequest(message: m, label: topic.displayLabel, settings: topic.popup.settings(timeoutSec: band.timeoutSec))))
+            if let card = topic.popup.card {
+                // Same path as a rule action (permissions, watchdog, redaction); its suppressDefaults is ignored.
+                do {
+                    effects += try rules.registry.run(card.providerId, ProviderContext(message: m, topic: topic, config: config), card.params).effects
+                } catch {
+                    Log.dispatch.error("topic card \(card.providerId, privacy: .public): \(String(describing: error), privacy: .public)")
+                }
+            } else {
+                effects.append(.popup(PopupRequest(message: m, label: topic.displayLabel, settings: topic.popup.settings(timeoutSec: band.timeoutSec))))
+            }
         }
         if let sound = band.sound, !sound.isEmpty { effects.append(.playSound(sound)) }
         if topic.copyToClipboard { effects.append(.copy(m.body)) }

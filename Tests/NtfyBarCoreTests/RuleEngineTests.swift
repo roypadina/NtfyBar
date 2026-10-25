@@ -129,6 +129,19 @@ struct RuleEngineTests {
         #expect(viaIgnore.handle(makeMessage(topicId: topicId, title: "noise"), config: c, now: Date()).isEmpty)
     }
 
+    @Test func builtinPopupInheritsTheBandTimeout() {
+        var c = config
+        c.topics[0].alerts["4"] = AlertBand(show: .popup, timeoutSec: 0)
+        let m = makeMessage(topicId: topicId, priority: 4)
+        let ctx = ProviderContext(message: m, topic: c.topics[0], config: c)
+        func timeout(_ p: Params) -> Int? {
+            guard case let .popup(req)? = try? ProviderRegistry().run("builtin.popup", ctx, p).effects.first else { return nil }
+            return req.settings.timeoutSec
+        }
+        #expect(timeout([:]) == 0)
+        #expect(timeout(["timeoutSec": .number(7)]) == 7)
+    }
+
     @Test func catchUpSkipsRulesUnlessProcessMissed() {
         let rule = Rule(name: "r", conditions: [cond("builtin.priority", ["value": .number(1)])], actions: [copyTitle])
         let d = Dispatcher(rules: RuleEngine(rules: [rule]))
