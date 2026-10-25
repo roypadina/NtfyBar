@@ -10,25 +10,12 @@ struct TopicsTab: View {
 
     var body: some View {
         HStack(spacing: 0) {
-            VStack(spacing: 0) {
-                List(selection: $selection) {
-                    ForEach(engine.config.topics) { t in
-                        HStack {
-                            Text(t.displayLabel)
-                            Spacer()
-                            if !t.enabled { Text("Off").font(.caption).foregroundStyle(.secondary) }
-                        }
-                        .tag(t.id)
-                    }
+            SidebarPane(selection: $selection, onAdd: addTopic, onRemove: { confirmDelete = true }, removeDisabled: selection == nil) {
+                ForEach(engine.config.topics) { t in
+                    // Subtitle is the plan, never the topic name (a secret).
+                    SidebarRow(enabled: t.enabled, title: t.displayLabel, subtitle: planSummary(t)).tag(t.id)
                 }
-                HStack {
-                    Button { addTopic() } label: { Image(systemName: "plus") }
-                    Button { confirmDelete = true } label: { Image(systemName: "minus") }.disabled(selection == nil)
-                    Spacer()
-                }
-                .buttonStyle(.borderless).padding(8)
-            }
-            .frame(width: 210)
+            } extraButtons: { EmptyView() }
             Divider()
             if let draft {
                 TopicEditor(model: model, engine: engine, draft: draft, isNew: true) { saved in
@@ -39,12 +26,8 @@ struct TopicsTab: View {
             } else if let id = selection, let topic = engine.config.topic(id) {
                 TopicEditor(model: model, engine: engine, draft: topic, isNew: false, onRemove: { confirmDelete = true }) { _ in }.id(id)
             } else {
-                VStack(spacing: 8) {
-                    Text(engine.config.topics.isEmpty ? "No topics yet." : "Select a topic.").font(.headline)
-                    Text("Add a topic with +. Use the same topic name as in the ntfy app on your phone.")
-                        .foregroundStyle(.secondary).multilineTextAlignment(.center)
-                }
-                .padding().frame(maxWidth: .infinity, maxHeight: .infinity)
+                EmptyState(icon: "bell.badge", title: engine.config.topics.isEmpty ? "No topics yet" : "Select a topic",
+                           caption: "Add a topic with +. Use the same topic name as in the ntfy app on your phone.")
             }
         }
         .onAppear { if selection == nil { selection = engine.config.topics.first?.id } }
@@ -71,6 +54,43 @@ struct TopicsTab: View {
         }
         selection = engine.config.topics.first?.id
     }
+
+    /// The Default band's plan, plus markers — e.g. "Popup 10 s · by priority · 1 rule".
+    private func planSummary(_ t: TopicConfig) -> String {
+        let b = t.band(3)
+        let popup = t.popup.card.map { cardName($0, engine) } ?? (b.timeoutSec == 0 ? "Popup, stays" : "Popup \(durationLabel(b.timeoutSec))")
+        var s = switch b.show {
+        case .nothing: "Nothing"
+        case .notification: "Notification"
+        case .popup: popup
+        case .both: t.popup.card == nil ? "Notification + popup" : popup + " + notification"
+        }
+        if t.bandsDiffer { s += " · by priority" }
+        let n = rulesTouching(t.id, engine).count
+        if n > 0 { s += " · \(n) rule\(n == 1 ? "" : "s")" }
+        return s
+    }
+}
+
+extension TopicConfig {
+    fileprivate var bandsDiffer: Bool { alerts.values.contains { $0 != band(3) } }
+}
+
+/// "Stays", "10 s", "2 min".
+private func durationLabel(_ sec: Int) -> String {
+    sec == 0 ? "Stays" : sec >= 60 && sec % 60 == 0 ? "\(sec / 60) min" : "\(sec) s"
+}
+
+/// A plugin card's name: its plugin's ("Alert Card"), else the provider's; the id when unavailable.
+@MainActor
+private func cardName(_ card: PluginCard, _ engine: Engine) -> String {
+    guard let d = engine.dispatcher.rules.registry.descriptors[card.providerId] else { return card.providerId }
+    return d.packageId.map(engine.pluginName) ?? d.name
+}
+
+@MainActor
+private func rulesTouching(_ topicId: UUID, _ engine: Engine) -> [Rule] {
+    engine.rules.rules.filter { $0.topicIds.isEmpty || $0.topicIds.contains(topicId) }
 }
 
 struct TopicEditor: View {
@@ -83,81 +103,143 @@ struct TopicEditor: View {
     @State private var error: String?
     @State private var status: String?
     @State private var commandOn = false
+    @State private var sameForAll = false
+
+    private static let timeouts = [0, 5, 10, 15, 20, 30, 60, 120, 300]
+    private static let sounds = ["Basso", "Blow", "Bottle", "Frog", "Funk", "Glass", "Hero", "Morse", "Ping", "Pop", "Purr", "Sosumi",
+                                 "Submarine", "Tink"]
 
     var body: some View {
-        Form {
-            Section {
-                TextField("Label", text: $draft.label, prompt: Text("Shown in menus and popups"))
-                Picker("Server", selection: $draft.serverId) {
-                    ForEach(engine.config.servers) { s in
-                        Text(ServerConfig.validatedURL(s.url)?.host() ?? s.url).tag(s.id)
+        EditorPane {
+            Form {
+                Section {
+                    TextField("Label", text: $draft.label, prompt: Text("Shown in menus and popups"))
+                    Picker("Server", selection: $draft.serverId) {
+                        ForEach(engine.config.servers) { s in
+                            Text(ServerConfig.validatedURL(s.url)?.host() ?? s.url).tag(s.id)
+                        }
                     }
+                    HStack {
+                        TextField("Topic", text: $draft.topic, prompt: Text("e.g. ntfybar-k3Xq9Lw2…"))
+                            .font(.system(.body, design: .monospaced))
+                        Button("Random") { draft.topic = TopicConfig.randomName() }
+                    }
+                    Toggle("Enabled", isOn: $draft.enabled)
+                } header: {
+                    Text("Subscription")
+                } footer: {
+                    FormFooter("Anyone who knows a topic name on a public server can read and send to it. Pick a long random one — and keep it out of screenshots.")
                 }
-                HStack {
-                    TextField("Topic", text: $draft.topic, prompt: Text("e.g. ntfybar-k3Xq9Lw2…"))
-                        .font(.system(.body, design: .monospaced))
-                    Button("Random") { draft.topic = TopicConfig.randomName() }
-                }
-                Toggle("Enabled", isOn: $draft.enabled)
-            } header: {
-                Text("Subscription")
-            } footer: {
-                Text("Anyone who knows a topic name on a public server can read and send to it. Pick a long random one — and keep it out of screenshots.")
-                    .font(.caption).foregroundStyle(.secondary)
-            }
 
-            Section("When a message arrives") {
-                // shortcut: all-priorities toggles until the per-priority plan table lands (1.4.0 M4).
-                Toggle("Show a macOS notification", isOn: showBinding(notification: true))
-                Toggle("Show NtfyBar's popup", isOn: showBinding(notification: false))
+                Section {
+                    Toggle("Same for every priority", isOn: Binding(get: { sameForAll }, set: { on in
+                        sameForAll = on
+                        if on { setBand(3, draft.band(3)) }  // copies the Default row to all five
+                    }))
+                    ForEach(sameForAll ? [3] : TopicConfig.priorities, id: \.self) { p in bandRow(p) }
+                } header: {
+                    Text("When a message arrives")
+                } footer: {
+                    FormFooter("Priority is set by the sender (1 min … 5 urgent). A popup stays until dismissed when Close after is Stays. Sounds are macOS system sounds; a notification without a sound here keeps the system notification sound.")
+                }
+
                 if draft.popsUpSomewhere {
-                    Picker("Show over", selection: $draft.popup.level) {
-                        Text("Normal windows").tag(PopupSettings.Level.floating)
-                        Text("Full-screen apps too").tag(PopupSettings.Level.overFullScreen)
+                    Section {
+                        Picker("Style", selection: cardSelection) {
+                            Text("NtfyBar popup").tag("")
+                            if let id = draft.popup.card?.providerId, !cardChoices.contains(where: { $0.id == id }) {
+                                Text("\(id) (plugin unavailable)").tag(id)
+                            }
+                            ForEach(cardChoices, id: \.id) { c in Text(c.label).tag(c.id) }
+                        }
+                        if let card = draft.popup.card {
+                            if let d = engine.dispatcher.rules.registry.descriptors[card.providerId] {
+                                ForEach(d.params, id: \.key) { spec in ParamField(spec: spec, params: cardParams, engine: engine) }
+                            } else {
+                                Text("Plugin unavailable — its settings are kept.").foregroundStyle(.secondary)
+                            }
+                        }
+                        Picker("Show over", selection: $draft.popup.level) {
+                            Text("Normal windows").tag(PopupSettings.Level.floating)
+                            Text("Full-screen apps too").tag(PopupSettings.Level.overFullScreen)
+                        }
+                        Picker("Position", selection: $draft.popup.position) {
+                            Text("Top center").tag(PopupSettings.Position.topCenter)
+                            Text("Top right").tag(PopupSettings.Position.topRight)
+                        }
+                        if draft.popup.card == nil {
+                            Toggle("Copy button", isOn: $draft.popup.showCopy)
+                            Toggle("Open button (click URL)", isOn: $draft.popup.showOpen)
+                        }
+                    } header: {
+                        Text("Popup")
+                    } footer: {
+                        FormFooter(draft.popup.card.map {
+                            "From the \(cardName($0, engine)) plugin. Its parameters decide timing, and may override Show over and Position; sounds come from the table above."
+                        } ?? "Timing and sound are set per priority above. The popup carries the message's own buttons, plus Copy and Open.")
                     }
-                    Picker("Position", selection: $draft.popup.position) {
-                        Text("Top center").tag(PopupSettings.Position.topCenter)
-                        Text("Top right").tag(PopupSettings.Position.topRight)
+                }
+
+                Section {
+                    Toggle("Copy the message to the clipboard", isOn: $draft.copyToClipboard)
+                    Toggle("Download attachments to ~/Downloads/NtfyBar", isOn: $draft.downloadAttachments)
+                    Toggle("Copy the downloaded attachment to the clipboard", isOn: $draft.copyAttachment)
+                        .disabled(!draft.downloadAttachments)
+                    Toggle("Run a command", isOn: $commandOn)
+                    if commandOn {
+                        TextField("Command", text: commandBinding, prompt: Text("say \"$NTFY_TITLE\""), axis: .vertical)
+                            .font(.system(.body, design: .monospaced)).lineLimit(1...4)
+                        Stepper("Time limit \(draft.command?.timeoutSec ?? 30) s", value: Binding(
+                            get: { draft.command?.timeoutSec ?? 30 }, set: { draft.command?.timeoutSec = $0 }), in: 1...600)
+                        Toggle("Notify me when it fails", isOn: Binding(
+                            get: { draft.command?.notifyOnFailure ?? true }, set: { draft.command?.notifyOnFailure = $0 }))
                     }
-                    Toggle("Copy button", isOn: $draft.popup.showCopy)
-                    Toggle("Open button (click URL)", isOn: $draft.popup.showOpen)
+                    Toggle("Also run all this for messages missed while away", isOn: $draft.processMissed)
+                } header: {
+                    Text("Also")
+                } footer: {
+                    FormFooter(commandOn
+                        ? "Runs with /bin/zsh in your home folder. The message arrives in $NTFY_MESSAGE, $NTFY_TITLE, $NTFY_PRIORITY, $NTFY_TAGS, $NTFY_CLICK, $NTFY_ID, $NTFY_TIME, $NTFY_JSON and on stdin — never pasted into the command itself. Quote them (\"$NTFY_TITLE\") and don't hand them to eval or osascript -e."
+                        : "These run for every priority, in addition to what you see above.")
                 }
-                Toggle("Copy the message to the clipboard", isOn: $draft.copyToClipboard)
-                Toggle("Download attachments to ~/Downloads/NtfyBar", isOn: $draft.downloadAttachments)
-                Toggle("Copy the downloaded attachment to the clipboard", isOn: $draft.copyAttachment)
-                    .disabled(!draft.downloadAttachments)
-                Toggle("Run a command", isOn: $commandOn)
-                if commandOn {
-                    TextField("Command", text: commandBinding, prompt: Text("say \"$NTFY_TITLE\""), axis: .vertical)
-                        .font(.system(.body, design: .monospaced)).lineLimit(1...4)
-                    Stepper("Time limit \(draft.command?.timeoutSec ?? 30) s", value: Binding(
-                        get: { draft.command?.timeoutSec ?? 30 }, set: { draft.command?.timeoutSec = $0 }), in: 1...600)
-                    Toggle("Notify me when it fails", isOn: Binding(
-                        get: { draft.command?.notifyOnFailure ?? true }, set: { draft.command?.notifyOnFailure = $0 }))
-                    Text("Runs with /bin/zsh in your home folder. The message arrives in $NTFY_MESSAGE, $NTFY_TITLE, $NTFY_PRIORITY, $NTFY_TAGS, $NTFY_CLICK, $NTFY_ID, $NTFY_TIME, $NTFY_JSON and on stdin — never pasted into the command itself. Quote them (\"$NTFY_TITLE\") and don't hand them to eval or osascript -e.")
-                        .font(.caption).foregroundStyle(.secondary)
-                }
-                Toggle("Also run all this for messages missed while away", isOn: $draft.processMissed)
-            }
 
-            Section("History") {
-                Stepper("Keep the last \(draft.retention.count) messages", value: $draft.retention.count, in: 10...10_000, step: 50)
-                Stepper("…for at most \(draft.retention.days) days", value: $draft.retention.days, in: 1...365)
-            }
+                let rules = isNew ? [] : rulesTouching(draft.id, engine)
+                if !rules.isEmpty {
+                    Section {
+                        ForEach(rules) { rule in
+                            HStack {
+                                Text(rule.name)
+                                Pill(rule.skipTopicDefaults ? "Instead" : "Also", tint: rule.skipTopicDefaults ? .orange : nil)
+                                if !rule.enabled { Pill("Off") }
+                                Spacer()
+                            }
+                        }
+                    } header: {
+                        Text("Rules that also apply")
+                    } footer: {
+                        FormFooter("Rules are exceptions: when a message matches, they add to this plan — or, marked Instead, replace it for that message. Edit them in Rules.")
+                    }
+                }
 
-            Section {
-                HStack {
-                    if let onRemove { Button("Remove Topic…", role: .destructive, action: onRemove) }
-                    Button("Send Test Message", action: sendTest).disabled(isNew)
-                    if let status { Text(status).foregroundStyle(.secondary) }
-                    Spacer()
-                    if let error { Text(error).foregroundStyle(.red) }
-                    Button("Save", action: save).keyboardShortcut(.defaultAction)
+                Section("History") {
+                    Stepper("Keep the last \(draft.retention.count) messages", value: $draft.retention.count, in: 10...10_000, step: 50)
+                    Stepper("…for at most \(draft.retention.days) days", value: $draft.retention.days, in: 1...365)
                 }
             }
+            .formStyle(.grouped)
+        } leading: {
+            if let onRemove { Button("Remove Topic…", role: .destructive, action: onRemove) }
+            Button("Send Test Message", action: sendTest).disabled(isNew)
+                .help("Publishes to this topic. NtfyBar ignores its own messages, so it shows on your other devices, not here.")
+            if let status { Text(status).foregroundStyle(.secondary).lineLimit(1) }
+        } trailing: {
+            if let error { Text(error).foregroundStyle(.red).lineLimit(1) }
+            Button("Save", action: save).keyboardShortcut(.defaultAction)
         }
-        .formStyle(.grouped)
-        .onAppear { commandOn = draft.command != nil }
+        .onAppear {
+            commandOn = draft.command != nil
+            sameForAll = !draft.bandsDiffer
+        }
         .onChange(of: commandOn) { _, on in
             if on && draft.command == nil { draft.command = CommandSettings(command: "") }
             if !on { draft.command = nil }
@@ -168,15 +250,70 @@ struct TopicEditor: View {
         Binding(get: { draft.command?.command ?? "" }, set: { draft.command?.command = $0 })
     }
 
-    /// On when any priority shows it; setting it changes every priority, keeping the other half.
-    private func showBinding(notification: Bool) -> Binding<Bool> {
-        Binding(get: { notification ? draft.notifiesSomewhere : draft.popsUpSomewhere },
-                set: { on in
-                    for (k, b) in draft.alerts {
-                        let n = notification ? on : b.showsNotification, p = notification ? b.showsPopup : on
-                        draft.alerts[k]?.show = n ? (p ? .both : .notification) : (p ? .popup : .nothing)
+    /// One plan row: what you see, when a popup closes, which sound. Under "Same for every priority" it is
+    /// the Default band, written to all five.
+    private func bandRow(_ p: Int) -> some View {
+        let band = Binding(get: { draft.band(p) }, set: { setBand(p, $0) })
+        let word = sameForAll ? "Any priority" : "\(PopupContent.priorityInfo(p).word) · \(p)"
+        let timeouts = Self.timeouts.contains(band.wrappedValue.timeoutSec) ? Self.timeouts : Self.timeouts + [band.wrappedValue.timeoutSec]
+        let sound = band.wrappedValue.sound
+        return LabeledContent(word) {
+            HStack(spacing: 8) {
+                Picker("Show", selection: Binding(get: { band.wrappedValue.show }, set: { show in
+                    var b = band.wrappedValue
+                    // Switching to a popup gives the familiar 1.3 defaults: urgent stays, Basso / Glass for urgent / high.
+                    if !b.showsPopup, show == .popup || show == .both, b.sound == nil {
+                        b.sound = ["5": "Basso", "4": "Glass"][String(p)]
+                        b.timeoutSec = p == 5 ? 0 : 20
                     }
+                    b.show = show
+                    band.wrappedValue = b
+                })) {
+                    Text("Nothing").tag(AlertBand.Show.nothing)
+                    Text("Notification").tag(AlertBand.Show.notification)
+                    Text("Popup").tag(AlertBand.Show.popup)
+                    Text("Notification + popup").tag(AlertBand.Show.both)
+                }
+                .labelsHidden().frame(width: 190)
+                Picker("Close after", selection: band.timeoutSec) {
+                    ForEach(timeouts, id: \.self) { Text(durationLabel($0)).tag($0) }
+                }
+                .labelsHidden().frame(width: 110)
+                .disabled(!band.wrappedValue.showsPopup || draft.popup.card != nil)  // a card decides its own timing
+                Picker("Sound", selection: band.sound) {
+                    Text("None").tag(String?.none)
+                    if let sound, !Self.sounds.contains(sound) { Text(sound).tag(String?.some(sound)) }
+                    ForEach(Self.sounds, id: \.self) { Text($0).tag(String?.some($0)) }
+                }
+                .labelsHidden().frame(width: 120)
+                .disabled(band.wrappedValue.show == .nothing)
+            }
+        }
+        .help("Priority as the sender set it (ntfy header Priority: 1–5).")
+    }
+
+    private func setBand(_ p: Int, _ band: AlertBand) {
+        for k in sameForAll ? TopicConfig.priorities : [p] { draft.alerts[String(k)] = band }
+    }
+
+    /// Plugin cards on offer: actions of active plugins that declare a popup.
+    private var cardChoices: [(id: String, label: String)] {
+        engine.pluginPackages.filter { $0.state == .active }.flatMap { pkg -> [(id: String, label: String)] in
+            guard let m = pkg.manifest, m.popup != nil else { return [] }
+            return m.providers.filter { $0.kind == "action" }.map { (id: $0.id, label: "\(m.name) · \($0.name)") }
+        }
+    }
+
+    private var cardSelection: Binding<String> {
+        Binding(get: { draft.popup.card?.providerId ?? "" },
+                set: { id in
+                    guard id != draft.popup.card?.providerId ?? "" else { return }
+                    draft.popup.card = id.isEmpty ? nil : PluginCard(providerId: id)
                 })
+    }
+
+    private var cardParams: Binding<Params> {
+        Binding(get: { draft.popup.card?.params ?? [:] }, set: { draft.popup.card?.params = $0 })
     }
 
     private func save() {
@@ -196,6 +333,10 @@ struct TopicEditor: View {
             return
         }
         if t.command?.command.trimmingCharacters(in: .whitespaces).isEmpty == true { draft.command = nil }
+        for (k, b) in draft.alerts {
+            draft.alerts[k]?.timeoutSec = max(0, b.timeoutSec)
+            if b.sound?.isEmpty == true { draft.alerts[k]?.sound = nil }
+        }
         let topic = draft
         try? engine.update { c in
             if let i = c.topics.firstIndex(where: { $0.id == topic.id }) { c.topics[i] = topic } else { c.topics.append(topic) }
