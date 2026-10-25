@@ -15,6 +15,7 @@ uses [Semantic Versioning](https://semver.org/).
 - Plugins say what each one adds (popup card, rule action, rule condition).
 
 ### Changed
+- New topics start with one plan for every priority (no automatic "urgent stays" or Basso/Glass sounds). Switching on **Handle important messages differently** pre-fills priority 4–5 with Stays (and Basso, if no sound is set).
 - `config.json` topic shape: `alerts` (per priority) and `popup` as a style (`level`, `position`, `showCopy`, `showOpen`, optional `card`). Topics with the 1.3 keys are still read and are rewritten in the new shape on the next save.
 - The first launch of 1.4 folds rules that only set a priority band's popup, sound or notification into the topic plans, once. The previous files are kept as `config.pre-1.4.json` and `rules.pre-1.4.json` and one notification says how many rules moved. Every other rule is kept as it was. To go back to 1.3.1, restore those two files.
 - A rule's **Show popup** without its own timeout uses the topic plan's **Close the popup after** for that priority; a rule popup with its own timeout no longer stays for urgent messages (1.3 applied the topic's "urgent stays" to it).

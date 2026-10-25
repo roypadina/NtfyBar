@@ -13,7 +13,7 @@ struct TopicsTab: View {
             SidebarPane(selection: $selection, onAdd: addTopic, onRemove: { confirmDelete = true }, removeDisabled: selection == nil) {
                 ForEach(engine.config.topics) { t in
                     // Subtitle is the plan, never the topic name (a secret).
-                    SidebarRow(enabled: t.enabled, title: t.displayLabel, subtitle: planSummary(t)).tag(t.id)
+                    SidebarRow(enabled: t.enabled, title: t.displayLabel, subtitle: planSummary(t)).tag(t.id).help(planSummary(t))
                 }
             } extraButtons: { EmptyView() }
             Divider()
@@ -211,8 +211,8 @@ struct TopicEditor: View {
                         Text("Popup")
                     } footer: {
                         FormFooter(draft.popup.card.map {
-                            "From the \(cardName($0, engine)) plugin. Its parameters decide timing; sounds come from the table above."
-                        } ?? "Timing and sound are set per priority above. The popup carries the message's own buttons, plus Copy and Open.")
+                            "From the \(cardName($0, engine)) plugin. Its parameters decide timing; sounds come from When a message arrives."
+                        } ?? "Timing and sound are set in When a message arrives. The popup carries the message's own buttons, plus Copy and Open.")
                     }
                 }
 
