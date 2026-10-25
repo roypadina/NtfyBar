@@ -137,7 +137,7 @@ enum BuiltinProviders {
                [ParamSpec("name", "Sound name", placeholder: "Glass")]) { _, p in
             ActionOutput([.playSound(try p.required("name"))])
         }
-        action("builtin.ignore", "Skip topic defaults", "Don't run the topic's own notification/popup/copy/command for this message.") { _, _ in
+        action("builtin.ignore", "Skip the topic's plan", "Don't run the topic's plan for this message (same as Instead with no actions).") { _, _ in
             ActionOutput(suppressDefaults: true)
         }
     }

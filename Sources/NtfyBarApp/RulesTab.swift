@@ -10,31 +10,27 @@ struct RulesTab: View {
 
     var body: some View {
         HStack(spacing: 0) {
-            VStack(spacing: 0) {
-                List(selection: $selection) {
-                    ForEach(rules) { r in
-                        HStack {
-                            Toggle("", isOn: Binding(get: { r.enabled }, set: { on in
-                                try? engine.updateRules { rs in
-                                    if let i = rs.firstIndex(where: { $0.id == r.id }) { rs[i].enabled = on }
-                                }
-                            }))
-                            .labelsHidden().toggleStyle(.checkbox)
-                            Text(r.name)
+            SidebarPane(selection: $selection, onAdd: { draft = Rule(name: "New rule"); selection = nil }, onRemove: remove,
+                        removeDisabled: selection == nil) {
+                ForEach(rules) { r in
+                    HStack {
+                        Toggle("", isOn: Binding(get: { r.enabled }, set: { on in
+                            try? engine.updateRules { rs in
+                                if let i = rs.firstIndex(where: { $0.id == r.id }) { rs[i].enabled = on }
+                            }
+                        }))
+                        .labelsHidden().toggleStyle(.checkbox)
+                        VStack(alignment: .leading, spacing: 1) {
+                            Text(r.name).lineLimit(1)
+                            Text(scope(r)).font(.caption).foregroundStyle(.secondary).lineLimit(1)
                         }
-                        .tag(r.id)
                     }
+                    .tag(r.id)
                 }
-                HStack {
-                    Button { draft = Rule(name: "New rule"); selection = nil } label: { Image(systemName: "plus") }
-                    Button { remove() } label: { Image(systemName: "minus") }.disabled(selection == nil)
-                    Button { move(-1) } label: { Image(systemName: "arrow.up") }.disabled(selection == nil)
-                    Button { move(1) } label: { Image(systemName: "arrow.down") }.disabled(selection == nil)
-                    Spacer()
-                }
-                .buttonStyle(.borderless).padding(8)
+            } extraButtons: {
+                Button { move(-1) } label: { Image(systemName: "arrow.up") }.disabled(selection == nil)
+                Button { move(1) } label: { Image(systemName: "arrow.down") }.disabled(selection == nil)
             }
-            .frame(width: 210)
             Divider()
             if let draft {
                 RuleEditor(engine: engine, draft: draft) { saved in
@@ -45,14 +41,19 @@ struct RulesTab: View {
             } else if let id = selection, let rule = rules.first(where: { $0.id == id }) {
                 RuleEditor(engine: engine, draft: rule, onRemove: { remove() }) { _ in }.id(id)
             } else {
-                VStack(spacing: 8) {
-                    Text("Rules run on every message that matches, top to bottom.").font(.headline)
-                    Text("Add one with +, or hand-edit Settings › General › Edit Rules File….").foregroundStyle(.secondary)
-                }
-                .padding().frame(maxWidth: .infinity, maxHeight: .infinity)
+                EmptyState(icon: "bolt.badge.clock", title: rules.isEmpty ? "No rules" : "Select a rule",
+                           caption: "Rules are exceptions to a topic's plan: when a message matches, also do something — or do it instead. To change what a topic always does, edit the topic in Topics.")
             }
         }
         .onAppear { if selection == nil { selection = rules.first?.id } }
+    }
+
+    /// "Instead · NAS · Monitoring +2": which topics the rule touches, so the top-to-bottom order reads.
+    private func scope(_ r: Rule) -> String {
+        let labels = r.topicIds.compactMap { engine.config.topic($0)?.displayLabel }
+        let topics = r.topicIds.isEmpty ? "Any topic"
+            : labels.prefix(2).joined(separator: " · ") + (labels.count > 2 ? " +\(labels.count - 2)" : "")
+        return (r.skipTopicDefaults ? "Instead · " : "") + topics
     }
 
     private func remove() {
@@ -79,41 +80,50 @@ struct RuleEditor: View {
     @State private var status: String?
 
     var body: some View {
-        Form {
-            Section("Rule") {
-                TextField("Name", text: $draft.name)
-                LabeledContent("Topics") {
-                    VStack(alignment: .leading) {
-                        Toggle("Any topic", isOn: Binding(get: { draft.topicIds.isEmpty }, set: { if $0 { draft.topicIds = [] } }))
-                        ForEach(engine.config.topics) { t in
-                            Toggle(t.displayLabel, isOn: Binding(
-                                get: { draft.topicIds.contains(t.id) },
-                                set: { on in
-                                    if on { draft.topicIds.append(t.id) } else { draft.topicIds.removeAll { $0 == t.id } }
-                                }))
+        EditorPane {
+            Form {
+                Section("Rule") {
+                    TextField("Name", text: $draft.name)
+                    LabeledContent("Topics") {
+                        VStack(alignment: .leading) {
+                            Toggle("Any topic", isOn: Binding(get: { draft.topicIds.isEmpty }, set: { if $0 { draft.topicIds = [] } }))
+                            ForEach(engine.config.topics) { t in
+                                Toggle(t.displayLabel, isOn: Binding(
+                                    get: { draft.topicIds.contains(t.id) },
+                                    set: { on in
+                                        if on { draft.topicIds.append(t.id) } else { draft.topicIds.removeAll { $0 == t.id } }
+                                    }))
+                            }
                         }
                     }
+                    Picker("Run when", selection: $draft.matchMode) {
+                        Text("all conditions match").tag(Rule.MatchMode.all)
+                        Text("any condition matches").tag(Rule.MatchMode.any)
+                    }
                 }
-                Picker("Run when", selection: $draft.matchMode) {
-                    Text("all conditions match").tag(Rule.MatchMode.all)
-                    Text("any condition matches").tag(Rule.MatchMode.any)
+                StepList(title: "Conditions", kind: .condition, steps: $draft.conditions, engine: engine)
+                Section {
+                    Picker("", selection: $draft.skipTopicDefaults) {
+                        Text("Also do the actions below").tag(false)
+                        Text("Instead of the topic's plan").tag(true)
+                    }
+                    .pickerStyle(.segmented).labelsHidden()
+                } header: {
+                    Text("Then")
+                } footer: {
+                    FormFooter(draft.skipTopicDefaults
+                        ? "For matching messages the topic's plan (notification, popup, sound, copy, download, command) is skipped; only the actions below run."
+                        : "The topic's plan runs as usual, plus the actions below.")
                 }
+                StepList(title: "Actions", kind: .action, steps: $draft.actions, engine: engine)
             }
-            StepList(title: "Conditions", kind: .condition, steps: $draft.conditions, engine: engine)
-            StepList(title: "Actions", kind: .action, steps: $draft.actions, engine: engine)
-            Section {
-                Toggle("Skip the topic's own notification/popup/copy/command", isOn: $draft.skipTopicDefaults)
-                HStack {
-                    if onRemove != nil { Button("Remove Rule…", role: .destructive) { confirmRemove = true } }
-                    if let status { Text(status).foregroundStyle(.secondary) }
-                    Spacer()
-                    Button("Save", action: save).keyboardShortcut(.defaultAction)
-                }
-            } footer: {
-                Text("A rule with no conditions never runs.").font(.caption).foregroundStyle(.secondary)
-            }
+            .formStyle(.grouped)
+        } leading: {
+            if onRemove != nil { Button("Remove Rule…", role: .destructive) { confirmRemove = true } }
+            if let status { Text(status).foregroundStyle(.secondary).lineLimit(1) }
+        } trailing: {
+            Button("Save", action: save).keyboardShortcut(.defaultAction)
         }
-        .formStyle(.grouped)
         .alert("Remove this rule?", isPresented: $confirmRemove) {
             Button("Remove", role: .destructive) { onRemove?() }
             Button("Cancel", role: .cancel) {}
@@ -162,6 +172,10 @@ struct StepList: View {
                     }
                 }
                 .padding(.vertical, 2)
+            }
+            if steps.isEmpty && kind == .condition {
+                Text("No conditions — this rule never runs. To change what a topic always does, edit its plan in Topics.")
+                    .foregroundStyle(.secondary)
             }
             Button("Add \(kind == .condition ? "Condition" : "Action")") {
                 steps.append(RuleStep(catalog.first?.id ?? ""))
