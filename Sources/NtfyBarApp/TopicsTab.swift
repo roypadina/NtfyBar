@@ -159,13 +159,19 @@ struct TopicEditor: View {
                                 Text("Plugin unavailable — its settings are kept.").foregroundStyle(.secondary)
                             }
                         }
-                        Picker("Show over", selection: $draft.popup.level) {
-                            Text("Normal windows").tag(PopupSettings.Level.floating)
-                            Text("Full-screen apps too").tag(PopupSettings.Level.overFullScreen)
+                        // A card's own level/position parameters replace these, so they are not shown twice.
+                        let cardKeys = Set(engine.dispatcher.rules.registry.descriptors[draft.popup.card?.providerId ?? ""]?.params.map(\.key) ?? [])
+                        if !cardKeys.contains("level") {
+                            Picker("Show over", selection: $draft.popup.level) {
+                                Text("Normal windows").tag(PopupSettings.Level.floating)
+                                Text("Full-screen apps too").tag(PopupSettings.Level.overFullScreen)
+                            }
                         }
-                        Picker("Position", selection: $draft.popup.position) {
-                            Text("Top center").tag(PopupSettings.Position.topCenter)
-                            Text("Top right").tag(PopupSettings.Position.topRight)
+                        if !cardKeys.contains("position") {
+                            Picker("Position", selection: $draft.popup.position) {
+                                Text("Top center").tag(PopupSettings.Position.topCenter)
+                                Text("Top right").tag(PopupSettings.Position.topRight)
+                            }
                         }
                         if draft.popup.card == nil {
                             Toggle("Copy button", isOn: $draft.popup.showCopy)
@@ -175,7 +181,7 @@ struct TopicEditor: View {
                         Text("Popup")
                     } footer: {
                         FormFooter(draft.popup.card.map {
-                            "From the \(cardName($0, engine)) plugin. Its parameters decide timing, and may override Show over and Position; sounds come from the table above."
+                            "From the \(cardName($0, engine)) plugin. Its parameters decide timing; sounds come from the table above."
                         } ?? "Timing and sound are set per priority above. The popup carries the message's own buttons, plus Copy and Open.")
                     }
                 }
@@ -274,18 +280,18 @@ struct TopicEditor: View {
                     Text("Popup").tag(AlertBand.Show.popup)
                     Text("Notification + popup").tag(AlertBand.Show.both)
                 }
-                .labelsHidden().frame(width: 190)
+                .labelsHidden().frame(width: 190, alignment: .trailing)
                 Picker("Close after", selection: band.timeoutSec) {
                     ForEach(timeouts, id: \.self) { Text(durationLabel($0)).tag($0) }
                 }
-                .labelsHidden().frame(width: 110)
+                .labelsHidden().frame(width: 110, alignment: .trailing)
                 .disabled(!band.wrappedValue.showsPopup || draft.popup.card != nil)  // a card decides its own timing
                 Picker("Sound", selection: band.sound) {
                     Text("None").tag(String?.none)
                     if let sound, !Self.sounds.contains(sound) { Text(sound).tag(String?.some(sound)) }
                     ForEach(Self.sounds, id: \.self) { Text($0).tag(String?.some($0)) }
                 }
-                .labelsHidden().frame(width: 120)
+                .labelsHidden().frame(width: 120, alignment: .trailing)
                 .disabled(band.wrappedValue.show == .nothing)
             }
         }

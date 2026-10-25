@@ -4,6 +4,25 @@ All notable changes to NtfyBar are documented here.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project
 uses [Semantic Versioning](https://semver.org/).
 
+## [1.4.0] - 2026-10-25
+
+### Added
+- One plan per topic: **Settings › Topics** shows a row per priority (Urgent … Min) with what you see (nothing, notification, popup, both), when a popup closes (Stays, 5 s … 5 min) and which sound plays, plus **Same for every priority**.
+- A plugin card (Alert Card, ACK Button, …) can be a topic's popup style, with its parameters in the topic editor.
+- The topic editor lists the rules that also apply to the topic, marked **Also** or **Instead**; the sidebar sums up each topic's plan.
+- Rules say **Also do the actions below** or **Instead of the topic's plan**, and the rule list shows each rule's topics.
+- Save (and Remove, Send Test Message) stay pinned below the Topics and Rules editors.
+- Plugins say what each one adds (popup card, rule action, rule condition).
+
+### Changed
+- `config.json` topic shape: `alerts` (per priority) and `popup` as a style (`level`, `position`, `showCopy`, `showOpen`, optional `card`). Topics with the 1.3 keys are still read and are rewritten in the new shape on the next save.
+- The first launch of 1.4 folds rules that only set a priority band's popup, sound or notification into the topic plans, once. The previous files are kept as `config.pre-1.4.json` and `rules.pre-1.4.json` and one notification says how many rules moved. Every other rule is kept as it was. To go back to 1.3.1, restore those two files.
+- Quiet hours are named **Quiet hours for sending** and say that incoming messages are not affected.
+- The rule action `builtin.ignore` is shown as **Skip the topic's plan** (same id).
+
+### Removed
+- `notify`, `soundOverride` and `popup.enabled` / `timeoutSec` / `stickyForUrgent` / `soundByPriority` are no longer written to new config files (they are still read).
+
 ## [1.3.1] - 2026-10-25
 
 ### Changed
