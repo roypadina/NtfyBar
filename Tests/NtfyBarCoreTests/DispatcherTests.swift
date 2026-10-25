@@ -85,13 +85,13 @@ struct DispatcherTests {
         #expect(kinds(also.handle(m, config: config, now: now)) == ["notify", "popup", "copy"])
     }
 
-    @Test func catchUpSummaryOnlyWhenSomeBandNotifies() {
+    @Test func catchUpSummaryUnlessEveryBandShowsNothing() {
         var c = config
-        for k in c.topics[0].alerts.keys { c.topics[0].alerts[k]?.show = .popup }
+        for k in c.topics[0].alerts.keys { c.topics[0].alerts[k]?.show = .nothing }
         let d = Dispatcher()
         _ = d.handle(makeMessage(topicId: topicId, isCatchUp: true), config: c, now: now)
         #expect(d.flushCatchUp(config: c, now: now).isEmpty)
-        c.topics[0].alerts["1"]?.show = .notification
+        c.topics[0].alerts["1"]?.show = .popup
         _ = d.handle(makeMessage(topicId: topicId, isCatchUp: true), config: c, now: now)
         #expect(d.flushCatchUp(config: c, now: now) == [.summaryNotification(topicId: topicId, label: "Builds", count: 1)])
     }

@@ -50,7 +50,11 @@ struct TopicsTab: View {
         try? engine.update { $0.topics.removeAll { $0.id == id } }
         engine.clearHistory(topicId: id)
         try? engine.updateRules { rules in
-            for i in rules.indices { rules[i].topicIds.removeAll { $0 == id } }
+            // A rule left with no topics would apply to every topic: switch it off instead.
+            for i in rules.indices where rules[i].topicIds.contains(id) {
+                rules[i].topicIds.removeAll { $0 == id }
+                if rules[i].topicIds.isEmpty { rules[i].enabled = false }
+            }
         }
         selection = engine.config.topics.first?.id
     }

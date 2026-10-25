@@ -76,7 +76,7 @@ public final class Dispatcher {
         defer { catchUpCounts.removeAll() }
         guard !config.isPaused(at: now) else { return [] }
         return catchUpCounts.sorted { $0.key.uuidString < $1.key.uuidString }.compactMap { topicId, count in
-            guard let topic = config.topic(topicId), topic.notifiesSomewhere else { return nil }
+            guard let topic = config.topic(topicId), topic.notifiesSomewhere || topic.popsUpSomewhere else { return nil }
             return .summaryNotification(topicId: topicId, label: topic.displayLabel, count: count)
         }
     }

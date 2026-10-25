@@ -86,9 +86,10 @@ public final class Engine {
             if !out.notes.isEmpty {
                 try store.backup(store.configURL)
                 try store.backup(store.rulesURL)
-                try store.saveRules(out.rules)
             }
+            // Config first: if the rules write fails, the old rules still skip the new plans, so behaviour is unchanged.
             try store.saveConfig(out.config)
+            if !out.notes.isEmpty { try store.saveRules(out.rules) }
         } catch {
             config.schemaVersion = 1
             Log.config.error("1.4 migration not saved, retried next launch: \(error.localizedDescription, privacy: .public)")

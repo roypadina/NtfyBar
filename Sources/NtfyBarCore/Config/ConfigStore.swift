@@ -45,10 +45,11 @@ public struct ConfigStore: Sendable {
         directory.appendingPathComponent(url.deletingPathExtension().lastPathComponent + ".pre-1.4.json")
     }
 
-    /// Copies `url` to its `backupURL` (mode 600, overwritten), when it exists.
+    /// Copies `url` to its `backupURL` (mode 600), when it exists. An existing backup is kept: it holds the 1.3 file.
     public func backup(_ url: URL) throws {
         guard let data = try? Data(contentsOf: url) else { return }
         let to = backupURL(url)
+        guard !FileManager.default.fileExists(atPath: to.path) else { return }
         try data.write(to: to, options: .atomic)
         try FileManager.default.setAttributes([.posixPermissions: 0o600], ofItemAtPath: to.path)
     }
