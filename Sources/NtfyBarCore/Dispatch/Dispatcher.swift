@@ -76,7 +76,7 @@ public final class Dispatcher {
         defer { catchUpCounts.removeAll() }
         guard !config.isPaused(at: now) else { return [] }
         return catchUpCounts.sorted { $0.key.uuidString < $1.key.uuidString }.compactMap { topicId, count in
-            guard let topic = config.topic(topicId), topic.notify else { return nil }
+            guard let topic = config.topic(topicId), topic.notifiesSomewhere else { return nil }
             return .summaryNotification(topicId: topicId, label: topic.displayLabel, count: count)
         }
     }
@@ -85,14 +85,12 @@ public final class Dispatcher {
 
     private func topicDefaults(_ m: Message, topic: TopicConfig) -> [Effect] {
         var effects: [Effect] = []
-        if topic.notify { effects.append(.notify(m, label: topic.displayLabel)) }
-        if topic.popup.enabled {
-            effects.append(.popup(PopupRequest(message: m, label: topic.displayLabel, settings: topic.popup)))
+        let band = topic.band(m.priority)
+        if band.showsNotification { effects.append(.notify(m, label: topic.displayLabel)) }
+        if band.showsPopup {
+            effects.append(.popup(PopupRequest(message: m, label: topic.displayLabel, settings: topic.popup.settings(timeoutSec: band.timeoutSec))))
         }
-        if let sound = topic.soundOverride ?? (topic.popup.enabled ? topic.popup.sound(forPriority: m.priority) : nil),
-           !sound.isEmpty {
-            effects.append(.playSound(sound))
-        }
+        if let sound = band.sound, !sound.isEmpty { effects.append(.playSound(sound)) }
         if topic.copyToClipboard { effects.append(.copy(m.body)) }
         if let e = Self.attachmentEffect(m, topic: topic) { effects.append(e) }
         if let command = topic.command, !command.command.trimmingCharacters(in: .whitespaces).isEmpty {

@@ -119,7 +119,7 @@ struct RuleEngineTests {
 
     @Test func skipTopicDefaultsThroughDispatcher() {
         var c = config
-        c.topics[0].popup.enabled = true
+        c.topics[0].alerts = AlertBand.expand(notify: true, popup: { var p = PopupSettings(); p.enabled = true; return p }(), soundOverride: nil)
         let rule = Rule(name: "quiet", conditions: [cond("builtin.titleContains", ["needle": .string("noise")])],
                         actions: [RuleStep("builtin.copy", ["what": .string("title")])], skipTopicDefaults: true)
         let d = Dispatcher(rules: RuleEngine(rules: [rule]))

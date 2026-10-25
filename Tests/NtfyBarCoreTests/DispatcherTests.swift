@@ -11,7 +11,7 @@ struct DispatcherTests {
 
     init() {
         var t = TopicConfig(id: topicId, serverId: config.servers[0].id, topic: "ntfybar-9f3a1c7b2e", label: "Builds")
-        t.popup.enabled = true
+        t.alerts = AlertBand.expand(notify: true, popup: { var p = PopupSettings(); p.enabled = true; return p }(), soundOverride: nil)
         config.topics = [t]
     }
 

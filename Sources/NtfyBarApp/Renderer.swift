@@ -93,11 +93,13 @@ enum DemoData {
         var c = Config()
         let selfHosted = ServerConfig(url: "https://ntfy.example.com", auth: .token("tk_demo"))
         c.servers.append(selfHosted)
+        var popupOn = PopupSettings()
+        popupOn.enabled = true
         var b = TopicConfig(id: builds, serverId: c.servers[0].id, topic: "ntfybar-9f3a1c7b2e", label: "CI builds")
-        b.popup.enabled = true
+        b.alerts = AlertBand.expand(notify: true, popup: popupOn, soundOverride: nil)
         b.command = CommandSettings(command: "say \"$NTFY_TITLE\"")
         var h = TopicConfig(id: home, serverId: selfHosted.id, topic: "ntfybar-4c81d0e6a2", label: "Home server")
-        h.popup.enabled = true
+        h.alerts = AlertBand.expand(notify: true, popup: popupOn, soundOverride: nil)
         h.popup.level = .overFullScreen
         let k = TopicConfig(id: backups, serverId: c.servers[0].id, topic: "ntfybar-7b3e95f0c1", label: "Backups")
         c.topics = [b, h, k]
@@ -142,8 +144,7 @@ enum DemoData {
                                       NtfyAction(action: "http", label: "Start cleanup", url: "https://example.com/api/cleanup", clear: true)],
                             contentType: "text/markdown")
         let m = Message(topicId: home, ntfy: n, receivedAt: Date(), isCatchUp: false, raw: "{}")
-        var s = engine.config.topic(home)?.popup ?? PopupSettings()
-        s.enabled = true
+        let s = engine.config.topic(home)?.popup.settings(timeoutSec: 0) ?? PopupSettings()
         return PopupRequest(message: m, label: "Home server", settings: s)
     }
 }

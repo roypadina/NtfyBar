@@ -107,12 +107,10 @@ struct TopicEditor: View {
             }
 
             Section("When a message arrives") {
-                Toggle("Show a macOS notification", isOn: $draft.notify)
-                Toggle("Show NtfyBar's popup", isOn: $draft.popup.enabled)
-                if draft.popup.enabled {
-                    Stepper("Close after \(draft.popup.timeoutSec == 0 ? "never (stays)" : "\(draft.popup.timeoutSec) s")",
-                            value: $draft.popup.timeoutSec, in: 0...600, step: 5)
-                    Toggle("Urgent messages stay until dismissed", isOn: $draft.popup.stickyForUrgent)
+                // shortcut: all-priorities toggles until the per-priority plan table lands (1.4.0 M4).
+                Toggle("Show a macOS notification", isOn: showBinding(notification: true))
+                Toggle("Show NtfyBar's popup", isOn: showBinding(notification: false))
+                if draft.popsUpSomewhere {
                     Picker("Show over", selection: $draft.popup.level) {
                         Text("Normal windows").tag(PopupSettings.Level.floating)
                         Text("Full-screen apps too").tag(PopupSettings.Level.overFullScreen)
@@ -123,8 +121,6 @@ struct TopicEditor: View {
                     }
                     Toggle("Copy button", isOn: $draft.popup.showCopy)
                     Toggle("Open button (click URL)", isOn: $draft.popup.showOpen)
-                    TextField("Sound for urgent", text: soundBinding("5"), prompt: Text("none"))
-                    TextField("Sound for high", text: soundBinding("4"), prompt: Text("none"))
                 }
                 Toggle("Copy the message to the clipboard", isOn: $draft.copyToClipboard)
                 Toggle("Download attachments to ~/Downloads/NtfyBar", isOn: $draft.downloadAttachments)
@@ -172,9 +168,15 @@ struct TopicEditor: View {
         Binding(get: { draft.command?.command ?? "" }, set: { draft.command?.command = $0 })
     }
 
-    private func soundBinding(_ priority: String) -> Binding<String> {
-        Binding(get: { draft.popup.soundByPriority[priority] ?? "" },
-                set: { draft.popup.soundByPriority[priority] = $0.isEmpty ? nil : $0 })
+    /// On when any priority shows it; setting it changes every priority, keeping the other half.
+    private func showBinding(notification: Bool) -> Binding<Bool> {
+        Binding(get: { notification ? draft.notifiesSomewhere : draft.popsUpSomewhere },
+                set: { on in
+                    for (k, b) in draft.alerts {
+                        let n = notification ? on : b.showsNotification, p = notification ? b.showsPopup : on
+                        draft.alerts[k]?.show = n ? (p ? .both : .notification) : (p ? .popup : .nothing)
+                    }
+                })
     }
 
     private func save() {

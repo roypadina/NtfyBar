@@ -60,7 +60,7 @@ final class AppModel {
 
     func showRecent(_ m: Message) {
         engine.markRead(m)
-        let settings = engine.config.topic(m.topicId)?.popup ?? PopupSettings()
+        let settings = engine.config.topic(m.topicId).map { $0.popup.settings(timeoutSec: $0.band(m.priority).timeoutSec) } ?? PopupSettings()
         performer.showPopup(PopupRequest(message: m, label: label(for: m.topicId), settings: settings), playSound: false)
     }
 
@@ -134,7 +134,7 @@ final class AppModel {
             guard let topicId = c.topicId, let messageId = c.messageId else { PopupPanel.dismiss(state); return }
             let req = PluginPopupRequest(pluginId: ref.pluginId, pluginName: engine.pluginName(ref.pluginId), spec: spec,
                                          topicId: topicId, messageId: messageId, label: label(for: topicId),
-                                         defaults: engine.config.topic(topicId)?.popup ?? PopupSettings())
+                                         defaults: engine.config.topic(topicId)?.popup.settings(timeoutSec: 0) ?? PopupSettings())
             var next = req.content
             next.key = c.key
             state.content = next

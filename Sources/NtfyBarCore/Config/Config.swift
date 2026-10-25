@@ -85,6 +85,8 @@ public struct ServerConfig: Codable, Equatable, Identifiable, Sendable {
     }
 }
 
+/// Runtime settings of one popup, and the pre-1.4 per-topic shape (decoded for migration). Topics
+/// store `PopupStyle` + `AlertBand`s.
 public struct PopupSettings: Codable, Equatable, Sendable {
     public enum Level: String, Codable, Sendable, CaseIterable { case floating, overFullScreen }
     public enum Position: String, Codable, Sendable, CaseIterable { case topCenter, topRight }
@@ -119,6 +121,105 @@ public struct PopupSettings: Codable, Equatable, Sendable {
     }
 
     public func sound(forPriority priority: Int) -> String? { soundByPriority[String(priority)] }
+}
+
+/// One row of a topic's plan: what happens for messages of one ntfy priority.
+public struct AlertBand: Codable, Equatable, Sendable {
+    public enum Show: String, Codable, Sendable, CaseIterable { case nothing, notification, popup, both }
+
+    public var show: Show = .notification
+    /// Popup only. 0 = stays until dismissed.
+    public var timeoutSec = 20
+    /// System sound name played by NtfyBar; nil = none (a macOS notification then keeps its own sound).
+    public var sound: String? = nil
+
+    public init(show: Show = .notification, timeoutSec: Int = 20, sound: String? = nil) {
+        self.show = show
+        self.timeoutSec = timeoutSec
+        self.sound = sound
+    }
+
+    private enum CodingKeys: String, CodingKey { case show, timeoutSec, sound }
+
+    public init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        show = c.value(.show, .notification)
+        timeoutSec = max(0, c.value(.timeoutSec, 20))
+        let s: String? = c.value(.sound, nil)
+        sound = s?.isEmpty == true ? nil : s
+    }
+
+    public var showsNotification: Bool { show == .notification || show == .both }
+    public var showsPopup: Bool { show == .popup || show == .both }
+
+    /// The 1.3 topic toggles as five bands — exactly what the 1.3 Dispatcher did per priority.
+    public static func expand(notify: Bool, popup: PopupSettings, soundOverride: String?) -> [String: AlertBand] {
+        var out: [String: AlertBand] = [:]
+        for p in 1...5 {
+            let show: Show = switch (notify, popup.enabled) {
+            case (true, true): .both
+            case (true, false): .notification
+            case (false, true): .popup
+            default: .nothing
+            }
+            let timeout = (p == 5 && popup.stickyForUrgent) ? 0 : popup.timeoutSec
+            let sound = soundOverride ?? (popup.enabled ? popup.sound(forPriority: p) : nil)
+            out[String(p)] = AlertBand(show: show, timeoutSec: timeout, sound: sound?.isEmpty == true ? nil : sound)
+        }
+        return out
+    }
+}
+
+/// A plugin popup used in place of NtfyBar's own (e.g. Alert Card): an action provider plus its parameters.
+public struct PluginCard: Codable, Equatable, Sendable {
+    public var providerId: String
+    public var params: Params
+
+    public init(providerId: String, params: Params = [:]) {
+        self.providerId = providerId
+        self.params = params
+    }
+
+    private enum CodingKeys: String, CodingKey { case providerId, params }
+
+    public init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        providerId = c.value(.providerId, "")
+        params = c.value(.params, [:])
+    }
+}
+
+/// How a topic's popup looks. Timing and sound are per priority (AlertBand).
+public struct PopupStyle: Codable, Equatable, Sendable {
+    public var level: PopupSettings.Level = .floating
+    public var position: PopupSettings.Position = .topCenter
+    public var showCopy = true
+    public var showOpen = true
+    public var card: PluginCard? = nil
+
+    public init() {}
+
+    private enum CodingKeys: String, CodingKey { case level, position, showCopy, showOpen, card }
+
+    public init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        let d = PopupStyle()
+        level = c.value(.level, d.level)
+        position = c.value(.position, d.position)
+        showCopy = c.value(.showCopy, d.showCopy)
+        showOpen = c.value(.showOpen, d.showOpen)
+        card = c.value(.card, nil)
+    }
+
+    /// The runtime settings for one popup: this style plus a band's timeout. `stickyForUrgent` is
+    /// false because the band already decided (timeoutSec 0 = stays).
+    public func settings(timeoutSec: Int) -> PopupSettings {
+        var s = PopupSettings()
+        s.enabled = true; s.timeoutSec = timeoutSec; s.stickyForUrgent = false
+        s.level = level; s.position = position; s.showCopy = showCopy; s.showOpen = showOpen
+        s.soundByPriority = [:]
+        return s
+    }
 }
 
 public struct CommandSettings: Codable, Equatable, Sendable {
@@ -167,15 +268,18 @@ public struct TopicConfig: Codable, Equatable, Identifiable, Sendable {
     public var topic: String
     public var label: String
     public var enabled = true
-    public var notify = true
-    public var popup = PopupSettings()
+    /// Keys "1"…"5" (ntfy priority). Missing key → AlertBand() (notification, 20 s, no sound).
+    public var alerts: [String: AlertBand] = TopicConfig.defaultAlerts
+    public var popup = PopupStyle()
     public var copyToClipboard = false
     public var downloadAttachments = false
     public var copyAttachment = false
     public var command: CommandSettings? = nil
     public var retention = Retention()
     public var processMissed = false
-    public var soundOverride: String? = nil
+
+    public static let priorities = [5, 4, 3, 2, 1]  // display order
+    public static let defaultAlerts: [String: AlertBand] = Dictionary(uniqueKeysWithValues: priorities.map { (String($0), AlertBand()) })
 
     public init(id: UUID = UUID(), serverId: UUID, topic: String, label: String) {
         self.id = id
@@ -185,8 +289,10 @@ public struct TopicConfig: Codable, Equatable, Identifiable, Sendable {
     }
 
     private enum CodingKeys: String, CodingKey {
-        case id, serverId, topic, label, enabled, notify, popup, copyToClipboard, downloadAttachments, copyAttachment, command, retention, processMissed, soundOverride
+        case id, serverId, topic, label, enabled, alerts, popup, copyToClipboard, downloadAttachments, copyAttachment, command, retention, processMissed
     }
+    /// Pre-1.4 keys: read to expand into `alerts`, never written.
+    private enum LegacyKeys: String, CodingKey { case notify, popup, soundOverride }
 
     public init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
@@ -195,16 +301,28 @@ public struct TopicConfig: Codable, Equatable, Identifiable, Sendable {
         topic = c.value(.topic, "")
         label = c.value(.label, "")
         enabled = c.value(.enabled, true)
-        notify = c.value(.notify, true)
-        popup = c.value(.popup, PopupSettings())
+        popup = c.value(.popup, PopupStyle())
         copyToClipboard = c.value(.copyToClipboard, false)
         downloadAttachments = c.value(.downloadAttachments, false)
         copyAttachment = c.value(.copyAttachment, false)
         command = c.value(.command, nil)
         retention = c.value(.retention, Retention())
         processMissed = c.value(.processMissed, false)
-        soundOverride = c.value(.soundOverride, nil)
+        if c.contains(.alerts) {
+            let read: [String: AlertBand] = c.value(.alerts, [:])
+            // Only "1"…"5", every one present, so the file always round-trips with all five.
+            alerts = Dictionary(uniqueKeysWithValues: Self.priorities.map { (String($0), read[String($0)] ?? AlertBand()) })
+        } else {  // pre-1.4 topic, or a hand-written one
+            let l = try decoder.container(keyedBy: LegacyKeys.self)
+            alerts = AlertBand.expand(notify: l.value(.notify, true), popup: l.value(.popup, PopupSettings()),
+                                      soundOverride: l.value(.soundOverride, nil))
+        }
     }
+
+    public func band(_ priority: Int) -> AlertBand { alerts[String(min(5, max(1, priority)))] ?? AlertBand() }
+    /// A catch-up summary notification is posted when any band notifies.
+    public var notifiesSomewhere: Bool { alerts.values.contains(where: \.showsNotification) }
+    public var popsUpSomewhere: Bool { alerts.values.contains(where: \.showsPopup) }
 
     /// ntfy topic names: a comma would subscribe a second topic, `/` or `?` would inject into the URL path.
     public static func isValidTopicName(_ name: String) -> Bool {
@@ -328,11 +446,13 @@ public struct Config: Codable, Equatable, Sendable {
     /// Notifications paused until this date; `Date.distantFuture` = until resumed.
     public var pausedUntil: Date? = nil
     public var publish = PublishSettings()
+    /// 2 = topics store plans (1.4). A file without the key is 1, which triggers the one-time migration.
+    public var schemaVersion = 2
 
     public init() {}
 
     private enum CodingKeys: String, CodingKey {
-        case servers, topics, plugins, quietHours, launchAtLogin, didRegisterLoginItem, pausedUntil, publish
+        case servers, topics, plugins, quietHours, launchAtLogin, didRegisterLoginItem, pausedUntil, publish, schemaVersion
     }
 
     public init(from decoder: Decoder) throws {
@@ -346,6 +466,7 @@ public struct Config: Codable, Equatable, Sendable {
         didRegisterLoginItem = c.value(.didRegisterLoginItem, false)
         pausedUntil = c.value(.pausedUntil, nil)
         publish = c.value(.publish, PublishSettings())
+        schemaVersion = c.value(.schemaVersion, 1)
     }
 
     public func server(_ id: UUID) -> ServerConfig? { servers.first { $0.id == id } }
