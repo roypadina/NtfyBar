@@ -6,6 +6,8 @@ uses [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [1.5.0] - 2026-10-30
+
 ### Added
 - A welcome window on first launch (and after this update): what NtfyBar does, where the icon is, how to add a topic, **Open at Login**, and a first step that opens **Settings › Topics**. Open it again from **Settings › About › Welcome Guide…**.
 - Opening NtfyBar again while it runs (from Applications or Raycast) opens Settings, so a status icon hidden by the notch or a full menu bar is no dead end.
@@ -22,6 +24,7 @@ uses [Semantic Versioning](https://semver.org/).
 - The Rules and Plugins tab icons are outline like the others.
 
 ### Fixed
+- Opening NtfyBar again no longer shows an empty Settings window next to the real one.
 - Unnamed buttons for VoiceOver: sidebar + and −, Move Up / Down, Delete Step, the rule checkbox and the step picker; the popup's hidden Cmd-C / Esc helpers and the About icons are no longer announced.
 
 ## [1.4.0] - 2026-10-25
