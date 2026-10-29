@@ -147,10 +147,11 @@ struct ServersTab: View {
     let engine: Engine
     @State private var selection: UUID?
     @State private var draft: ServerConfig?
+    @State private var confirmRemove = false
 
     var body: some View {
         HStack(spacing: 0) {
-            SidebarPane(selection: $selection, onAdd: { draft = ServerConfig(url: "https://"); selection = nil }, onRemove: remove,
+            SidebarPane(selection: $selection, onAdd: { draft = ServerConfig(url: "https://"); selection = nil }, onRemove: { confirmRemove = true },
                         removeDisabled: selection == nil || engine.config.topics.contains { $0.serverId == selection },
                         removeHelp: "A server still used by a topic can't be removed") {
                 ForEach(engine.config.servers) { s in
@@ -165,12 +166,18 @@ struct ServersTab: View {
                 }
                 .id("new")
             } else if let id = selection, let server = engine.config.server(id) {
-                ServerEditor(engine: engine, draft: server, isNew: false, onRemove: { remove() }) { _ in }.id(id)
+                ServerEditor(engine: engine, draft: server, isNew: false, onRemove: { confirmRemove = true }) { _ in }.id(id)
             } else {
                 EmptyState(icon: "server.rack", title: "Select a server", caption: "Add your own ntfy server with +. ntfy.sh is built in.")
             }
         }
         .onAppear { if selection == nil { selection = engine.config.servers.first?.id } }
+        .alert("Remove this server?", isPresented: $confirmRemove) {
+            Button("Remove", role: .destructive) { remove() }
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text("Its address and sign-in details are deleted from NtfyBar.")
+        }
     }
 
     private func authKind(_ auth: ServerAuth) -> String {
@@ -195,7 +202,6 @@ struct ServerEditor: View {
     var onRemove: (() -> Void)? = nil
     let onDone: (UUID?) -> Void
     @State private var authType = "none"
-    @State private var confirmRemove = false
     @State private var user = ""
     @State private var pass = ""
     @State private var token = ""
@@ -231,19 +237,13 @@ struct ServerEditor: View {
         } leading: {
             if onRemove != nil {
                 let inUse = engine.config.topics.contains { $0.serverId == draft.id }
-                Button("Remove Server…", role: .destructive) { confirmRemove = true }
+                Button("Remove Server…", role: .destructive) { onRemove?() }
                     .disabled(inUse)
                     .help(inUse ? "Remove or move its topics first" : "")
             }
         } trailing: {
             if let error { Text(error).foregroundStyle(.red).lineLimit(1) }
             Button("Save", action: save).keyboardShortcut(.defaultAction)
-        }
-        .alert("Remove this server?", isPresented: $confirmRemove) {
-            Button("Remove", role: .destructive) { onRemove?() }
-            Button("Cancel", role: .cancel) {}
-        } message: {
-            Text("Its address and sign-in details are deleted from NtfyBar.")
         }
         .onAppear {
             switch draft.auth {

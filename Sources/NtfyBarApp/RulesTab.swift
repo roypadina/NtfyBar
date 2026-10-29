@@ -5,12 +5,13 @@ struct RulesTab: View {
     let engine: Engine
     @State private var selection: UUID?
     @State private var draft: Rule?
+    @State private var confirmRemove = false
 
     private var rules: [Rule] { engine.rules.rules }
 
     var body: some View {
         HStack(spacing: 0) {
-            SidebarPane(selection: $selection, onAdd: { draft = Rule(name: "New rule"); selection = nil }, onRemove: remove,
+            SidebarPane(selection: $selection, onAdd: { draft = Rule(name: "New rule"); selection = nil }, onRemove: { confirmRemove = true },
                         removeDisabled: selection == nil) {
                 ForEach(rules) { r in
                     HStack {
@@ -41,13 +42,17 @@ struct RulesTab: View {
                 }
                 .id("new")
             } else if let id = selection, let rule = rules.first(where: { $0.id == id }) {
-                RuleEditor(engine: engine, draft: rule, onRemove: { remove() }) { _ in }.id(id)
+                RuleEditor(engine: engine, draft: rule, onRemove: { confirmRemove = true }) { _ in }.id(id)
             } else {
                 EmptyState(icon: "bolt.badge.clock", title: rules.isEmpty ? "No rules" : "Select a rule",
                            caption: "Rules are exceptions to a topic's plan: when a message matches, also do something — or do it instead. To change what a topic always does, edit the topic in Topics.")
             }
         }
         .onAppear { if selection == nil { selection = rules.first?.id } }
+        .alert("Remove this rule?", isPresented: $confirmRemove) {
+            Button("Remove", role: .destructive) { remove() }
+            Button("Cancel", role: .cancel) {}
+        }
     }
 
     /// "Instead · NAS · Monitoring +2": which topics the rule touches, so the top-to-bottom order reads.
@@ -78,7 +83,6 @@ struct RuleEditor: View {
     @State var draft: Rule
     var onRemove: (() -> Void)? = nil
     let onDone: (UUID?) -> Void
-    @State private var confirmRemove = false
     @State private var status: String?
 
     var body: some View {
@@ -125,14 +129,10 @@ struct RuleEditor: View {
                 .padding(20)
             }
         } leading: {
-            if onRemove != nil { Button("Remove Rule…", role: .destructive) { confirmRemove = true } }
+            if onRemove != nil { Button("Remove Rule…", role: .destructive) { onRemove?() } }
             if let status { Text(status).foregroundStyle(.secondary).lineLimit(1) }
         } trailing: {
             Button("Save", action: save).keyboardShortcut(.defaultAction)
-        }
-        .alert("Remove this rule?", isPresented: $confirmRemove) {
-            Button("Remove", role: .destructive) { onRemove?() }
-            Button("Cancel", role: .cancel) {}
         }
     }
 
