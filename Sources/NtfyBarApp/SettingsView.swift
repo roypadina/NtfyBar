@@ -5,8 +5,8 @@ import UserNotifications
 struct SettingsView: View {
     let model: AppModel
     let engine: Engine
-    var initialTab = "general"
-    @State private var tab = ""
+    var initialTab: String?  // only the Renderer sets it
+    @AppStorage("settingsTab") private var tab = "general"  // reopen on the last tab (SET-3)
 
     var body: some View {
         TabView(selection: $tab) {
@@ -17,14 +17,14 @@ struct SettingsView: View {
             ServersTab(engine: engine)
                 .tabItem { Label("Servers", systemImage: "server.rack") }.tag("servers")
             RulesTab(engine: engine)
-                .tabItem { Label("Rules", systemImage: "bolt.fill") }.tag("rules")
+                .tabItem { Label("Rules", systemImage: "bolt") }.tag("rules")
             PluginsTab(model: model, engine: engine)
-                .tabItem { Label("Plugins", systemImage: "puzzlepiece.extension.fill") }.tag("plugins")
+                .tabItem { Label("Plugins", systemImage: "puzzlepiece.extension") }.tag("plugins")
             AboutTab()
                 .tabItem { Label("About", systemImage: "info.circle") }.tag("about")
         }
         .frame(minWidth: 820, idealWidth: 900, minHeight: 640, idealHeight: 720)
-        .onAppear { if tab.isEmpty { tab = initialTab } }
+        .onAppear { if let initialTab { tab = initialTab } }
     }
 }
 

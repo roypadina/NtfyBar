@@ -12,6 +12,7 @@ final class AppModel {
     private(set) lazy var performer = EffectPerformer(model: self)
     let isTestMode = ProcessInfo.processInfo.environment["NTFYBAR_TEST"] == "1"
     private var started = false
+    private var resumeTask: Task<Void, Never>?
 
     private init() {
         do {
@@ -41,6 +42,7 @@ final class AppModel {
         engine.start()
         engine.startNetworkMonitoring()
         engine.startWatchingFiles()
+        scheduleResume()
         NSWorkspace.shared.notificationCenter.addObserver(forName: NSWorkspace.didWakeNotification, object: nil,
                                                           queue: .main) { [weak self] _ in
             MainActor.assumeIsolated { self?.engine.reconnectAll() }
@@ -50,6 +52,18 @@ final class AppModel {
 
     func pause(until date: Date?) {
         try? engine.update { $0.pausedUntil = date }
+        scheduleResume()
+    }
+
+    /// A timed pause ends without a state change; clear it then, so the status icon (which watches the config) goes back to the bell.
+    private func scheduleResume() {
+        resumeTask?.cancel()
+        guard let until = engine.config.pausedUntil, until != .distantFuture, until > Date() else { return }
+        resumeTask = Task { [weak self] in
+            try? await Task.sleep(for: .seconds(until.timeIntervalSinceNow))
+            guard !Task.isCancelled, let self, self.engine.config.pausedUntil == until else { return }
+            try? self.engine.update { $0.pausedUntil = nil }
+        }
     }
 
     func label(for topicId: UUID) -> String {
@@ -171,6 +185,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             .contains(where: { $0.processIdentifier != ProcessInfo.processInfo.processIdentifier }) {
             exit(0)
         }
+    }
+
+    /// Opening the app again (Finder, Raycast) while its icon is hidden by the notch or a full menu bar.
+    @MainActor
+    func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows flag: Bool) -> Bool {
+        if !flag { SettingsOpener.open() }
+        return true
     }
 
     func applicationDidFinishLaunching(_ notification: Notification) {

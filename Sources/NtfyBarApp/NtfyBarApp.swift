@@ -35,9 +35,18 @@ struct NtfyBarApp: App {
 
 struct MenuBarLabel: View {
     let engine: Engine
+    @Environment(\.openSettings) private var openSettings
 
     var body: some View {
-        Image(nsImage: NtfyBarApp.menuBarIcon)
+        // The label is always alive, so it hands the openSettings action to code that has no environment (reopen, Welcome).
+        Group {
+            if engine.config.isPaused(at: Date()) {
+                Image(systemName: "bell.slash").accessibilityLabel("NtfyBar, paused")
+            } else {
+                Image(nsImage: NtfyBarApp.menuBarIcon)
+            }
+        }
+        .onAppear { SettingsOpener.action = openSettings }
         if engine.unreadCount > 0 {
             Text(engine.unreadCount > 99 ? "99+" : "\(engine.unreadCount)")
         }
@@ -53,6 +62,13 @@ struct MenuContent: View {
 
         if !engine.recent.isEmpty {
             Menu("Recent") {
+                if let latest = engine.recent.first {
+                    Button("Copy Latest Message") { model.performer.copy(latest.body) }
+                    if SafeOpen.url(latest.ntfy.click) != nil {
+                        Button("Open Latest Link") { model.performer.open(latest.ntfy.click) }
+                    }
+                    Divider()
+                }
                 ForEach(engine.recent) { m in
                     Button(model.recentTitle(m)) { model.showRecent(m) }
                 }
@@ -63,6 +79,7 @@ struct MenuContent: View {
         Button("Publish…") { PublishWindow.show(model: model) }
         Button("Mark All Read") { engine.markAllRead() }
             .disabled(engine.unreadCount == 0)
+        Button("Dismiss All Popups") { PopupPanel.dismissAll() }  // always enabled: the popup list isn't observable
 
         Menu("Pause Notifications") {
             if engine.config.isPaused(at: Date()) {

@@ -309,7 +309,7 @@ struct PluginsTab: View {
         panel.canChooseFiles = false
         panel.allowsMultipleSelection = false
         panel.prompt = "Add"
-        NSApp.activate(ignoringOtherApps: true)
+        NSApp.activate()
         guard panel.runModal() == .OK, let url = panel.url else { return }
         updateFolders { if !$0.contains(url.path) { $0.append(url.path) } }
     }
