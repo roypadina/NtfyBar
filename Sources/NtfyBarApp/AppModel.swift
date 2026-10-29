@@ -181,7 +181,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     @MainActor
     func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows flag: Bool) -> Bool {
         if !flag { SettingsOpener.open() }
-        return true
+        return false  // true lets SwiftUI also open its Settings scene, empty (PullPing 0.1.2 gotcha)
     }
 
     func applicationDidFinishLaunching(_ notification: Notification) {
