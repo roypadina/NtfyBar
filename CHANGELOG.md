@@ -4,6 +4,26 @@ All notable changes to NtfyBar are documented here.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project
 uses [Semantic Versioning](https://semver.org/).
 
+## [Unreleased]
+
+### Added
+- A welcome window on first launch (and after this update): what NtfyBar does, where the icon is, how to add a topic, **Open at Login**, and a first step that opens **Settings › Topics**. Open it again from **Settings › About › Welcome Guide…**.
+- Opening NtfyBar again while it runs (from Applications or Raycast) opens Settings, so a status icon hidden by the notch or a full menu bar is no dead end.
+- The status icon turns into a crossed-out bell while notifications are paused, and goes back when a timed pause ends.
+- Status menu: **Dismiss All Popups**, and **Copy Latest Message** / **Open Latest Link** at the top of **Recent**, so popup actions work without the mouse.
+- Settings opens on the tab you used last.
+- Removing a rule or a server with the sidebar − button, and uninstalling a plugin, now ask first (the editors already did).
+- A line under **Hours** says when a quiet-hours time is not valid and is not saved yet.
+
+### Changed
+- **Open at Login** (Settings › General and the welcome window) shows the real login-item state, offers **Allow in Login Items…** when macOS needs approval, and reports a copy that is not in Applications. NtfyBar no longer registers itself as a login item on first launch; installs that already have it keep it.
+- History, Publish, About and Welcome open as proper windows: NtfyBar shows in the Dock and Cmd-Tab while one is open, and hides again when the last one closes. History is released when closed.
+- A failed test send says why (`Couldn't send: …`), and a plugin marketplace that can't be loaded is named with its reason.
+- The Rules and Plugins tab icons are outline like the others.
+
+### Fixed
+- Unnamed buttons for VoiceOver: sidebar + and −, Move Up / Down, Delete Step, the rule checkbox and the step picker; the popup's hidden Cmd-C / Esc helpers and the About icons are no longer announced.
+
 ## [1.4.0] - 2026-10-25
 
 ### Added

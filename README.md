@@ -221,7 +221,7 @@ brew uninstall --cask ntfybar
 ```
 
 Then remove its data if you like: `~/Library/Application Support/NtfyBar/`
-(`brew uninstall --zap --cask ntfybar` does this for you). If you enabled **Launch at login**,
+(`brew uninstall --zap --cask ntfybar` does this for you). If you turned on **Open at Login**,
 switch it off first in Settings › General.
 
 ## Feature requests and contributions
