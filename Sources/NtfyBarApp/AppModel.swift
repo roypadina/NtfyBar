@@ -55,12 +55,16 @@ final class AppModel {
     }
 
     /// A timed pause ends without a state change; clear it then, so the status icon (which watches the config) goes back to the bell.
-    private func scheduleResume() {
+    /// Called on every change of `pausedUntil` (menu, reload, external edit). The config file stores whole seconds, so the
+    /// check is "expired", not "unchanged", and the extra second covers that rounding.
+    func scheduleResume() {
         resumeTask?.cancel()
         guard let until = engine.config.pausedUntil, until != .distantFuture, until > Date() else { return }
         resumeTask = Task { [weak self] in
-            try? await Task.sleep(for: .seconds(until.timeIntervalSinceNow))
-            guard !Task.isCancelled, let self, self.engine.config.pausedUntil == until else { return }
+            try? await Task.sleep(for: .seconds(until.timeIntervalSinceNow + 1))
+            guard !Task.isCancelled, let self else { return }
+            self.engine.reloadIfChangedOnDisk()  // don't overwrite an external edit the 2 s poll hasn't read yet
+            guard let p = self.engine.config.pausedUntil, p != .distantFuture, p <= Date() else { return }
             try? self.engine.update { $0.pausedUntil = nil }
         }
     }

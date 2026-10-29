@@ -47,6 +47,7 @@ struct MenuBarLabel: View {
             }
         }
         .onAppear { SettingsOpener.action = openSettings }
+        .onChange(of: engine.config.pausedUntil) { _, _ in AppModel.shared.scheduleResume() }  // a reload or external edit can set a pause
         if engine.unreadCount > 0 {
             Text(engine.unreadCount > 99 ? "99+" : "\(engine.unreadCount)")
         }

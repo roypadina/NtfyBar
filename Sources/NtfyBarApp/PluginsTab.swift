@@ -60,7 +60,7 @@ struct PluginsTab: View {
             Button("Uninstall", role: .destructive) { try? engine.uninstallPlugin(pkg.id) }
             Button("Cancel", role: .cancel) {}
         } message: { _ in
-            Text("You can install it again from Available.")
+            Text("Its saved data and permissions are removed. You can install it again from Available.")
         }
     }
 
