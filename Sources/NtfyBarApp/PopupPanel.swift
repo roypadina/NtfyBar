@@ -331,10 +331,10 @@ struct PopupView: View {
             // ⌘C copies the message; Esc dismisses. Both only once the popup is key (after a click).
             if let text = c.copyText, !text.isEmpty {
                 Button("") { perform(PopupContent.Button(id: "copy", label: "Copy", action: .copy(text))) }
-                    .keyboardShortcut("c", modifiers: .command).opacity(0).frame(width: 0)
+                    .keyboardShortcut("c", modifiers: .command).opacity(0).frame(width: 0).accessibilityHidden(true)
             }
             if let dismiss {
-                Button("") { perform(dismiss) }.keyboardShortcut(.cancelAction).opacity(0).frame(width: 0)
+                Button("") { perform(dismiss) }.keyboardShortcut(.cancelAction).opacity(0).frame(width: 0).accessibilityHidden(true)
             }
         }
     }

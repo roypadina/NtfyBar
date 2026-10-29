@@ -86,6 +86,10 @@ struct GeneralTab: View {
                             .frame(width: 64).multilineTextAlignment(.center)
                     }
                 }
+                if !validTimes {
+                    Label("Use 24-hour HH:MM, for example 20:00. Not saved yet.", systemImage: "exclamationmark.triangle")
+                        .foregroundStyle(Theme.warning)
+                }
                 Picker("Highest priority during quiet hours", selection: configBinding(engine, \.quietHours.maxPriority)) {
                     ForEach(1...5, id: \.self) { p in Text(PopupContent.priorityInfo(p).word).tag(p) }
                 }
@@ -271,7 +275,7 @@ struct AboutTab: View {
 
     var body: some View {
         VStack(spacing: 10) {
-            Image(nsImage: NSApp.applicationIconImage).resizable().frame(width: 64, height: 64)
+            Image(nsImage: NSApp.applicationIconImage).resizable().frame(width: 64, height: 64).accessibilityHidden(true)
             Text("NtfyBar").font(.title2.bold())
             Text("Version \(info["CFBundleShortVersionString"] as? String ?? "dev") (\(info["CFBundleVersion"] as? String ?? "dev"))")
                 .foregroundStyle(.secondary)

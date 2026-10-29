@@ -14,7 +14,7 @@ struct RulesTab: View {
                         removeDisabled: selection == nil) {
                 ForEach(rules) { r in
                     HStack {
-                        Toggle("", isOn: Binding(get: { r.enabled }, set: { on in
+                        Toggle(r.name, isOn: Binding(get: { r.enabled }, set: { on in
                             try? engine.updateRules { rs in
                                 if let i = rs.firstIndex(where: { $0.id == r.id }) { rs[i].enabled = on }
                             }
@@ -29,7 +29,9 @@ struct RulesTab: View {
                 }
             } extraButtons: {
                 Button { move(-1) } label: { Image(systemName: "arrow.up") }.disabled(selection == nil)
+                    .help("Move Up").accessibilityLabel("Move Up")
                 Button { move(1) } label: { Image(systemName: "arrow.down") }.disabled(selection == nil)
+                    .help("Move Down").accessibilityLabel("Move Down")
             }
             Divider()
             if let draft {
@@ -199,7 +201,7 @@ struct StepRow: View {
         let descriptor = catalog.first { $0.id == step.providerId }
         VStack(alignment: .leading, spacing: 6) {
             HStack(spacing: 8) {
-                Picker("", selection: $step.providerId) {
+                Picker("Step", selection: $step.providerId) {
                     if descriptor == nil {
                         Text("\(step.providerId) (plugin unavailable)").tag(step.providerId)
                     }
@@ -217,6 +219,7 @@ struct StepRow: View {
                 }
                 Spacer(minLength: 0)
                 Button(role: .destructive) { onDelete() } label: { Image(systemName: "trash") }.buttonStyle(.borderless)
+                    .help("Delete Step").accessibilityLabel("Delete Step")
             }
             if let d = descriptor {
                 ForEach(d.params, id: \.key) { ParamField(spec: $0, params: $step.params, engine: engine) }

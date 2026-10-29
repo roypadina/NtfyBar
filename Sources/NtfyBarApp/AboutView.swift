@@ -25,6 +25,7 @@ struct AboutView: View {
             Image(nsImage: NSApp.applicationIconImage)
                 .resizable()
                 .frame(width: 96, height: 96)
+                .accessibilityHidden(true)
 
             VStack(spacing: 2) {
                 Text("NtfyBar").font(.title.bold())
