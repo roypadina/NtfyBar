@@ -47,7 +47,6 @@ final class AppModel {
                                                           queue: .main) { [weak self] _ in
             MainActor.assumeIsolated { self?.engine.reconnectAll() }
         }
-        registerLoginItemOnce()
     }
 
     func pause(until date: Date?) {
@@ -160,19 +159,6 @@ final class AppModel {
             PopupPanel.relayout()
         }
     }
-
-    /// Registered once, and only for the installed copy: a dev build in dist/ must never become
-    /// the login item.
-    private func registerLoginItemOnce() {
-        let config = engine.config
-        guard !isTestMode, !config.didRegisterLoginItem, Bundle.main.bundlePath.hasPrefix("/Applications/") else { return }
-        do {
-            try LoginItemManager().setEnabled(config.launchAtLogin)
-        } catch {
-            Log.app.error("login item: \(error.localizedDescription, privacy: .public)")
-        }
-        try? engine.update { $0.didRegisterLoginItem = true }
-    }
 }
 
 final class AppDelegate: NSObject, NSApplicationDelegate {
@@ -200,7 +186,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         // Live subscriptions must not be napped.
         activity = ProcessInfo.processInfo.beginActivity(options: [.userInitiatedAllowingIdleSystemSleep],
                                                          reason: "Live ntfy subscriptions")
-        MainActor.assumeIsolated { AppModel.shared.start() }
+        MainActor.assumeIsolated {
+            AppModel.shared.start()
+            if !AppModel.shared.isTestMode { WelcomeWindow.showOnce() }
+        }
     }
 
     /// An accessory app only gets ⌘C/⌘V/⌘X/⌘A in text fields when the main menu has these items.

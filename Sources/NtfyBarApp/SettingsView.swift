@@ -45,12 +45,7 @@ struct GeneralTab: View {
     var body: some View {
         Form {
             Section("Startup") {
-                Toggle("Launch NtfyBar at login", isOn: Binding(
-                    get: { engine.config.launchAtLogin },
-                    set: { on in
-                        try? LoginItemManager().setEnabled(on)
-                        try? engine.update { $0.launchAtLogin = on }
-                    }))
+                LaunchAtLoginToggle()
             }
             Section("Notifications") {
                 LabeledContent("macOS notifications") {
@@ -282,6 +277,7 @@ struct AboutTab: View {
                 .foregroundStyle(.secondary)
             HStack {
                 Button("About NtfyBar…") { AboutWindow.show() }
+                Button("Welcome Guide…") { WelcomeWindow.show() }
                 Button("Support on Ko-fi ☕") { NSWorkspace.shared.open(NtfyBarApp.koFiURL) }.buttonStyle(.borderedProminent)
             }
             .controlSize(.large).padding(.top, 4)
