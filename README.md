@@ -97,8 +97,15 @@ plus `popup` (`level`, `position`, `showCopy`, `showOpen`, optional plugin `card
 next save. The first 1.4 launch folds priority-only rules into topic plans and keeps the old files as
 `config.pre-1.4.json` and `rules.pre-1.4.json` (restore them to go back to 1.3).
 
-The menu shows the connection state, your last messages (unread count next to the bell), **Send
-Clipboard**, **Publish…**, **Mark All Read**, **Pause Notifications** and **History…**.
+The first time you open NtfyBar, a **Welcome** window says where the bell is, how to add a topic and offers
+**Open at Login** (off until you switch it on; reopen the window from **Settings › About › Welcome Guide…**).
+Opening NtfyBar again while it runs (from Applications or Raycast) opens Settings, so a bell hidden by the notch or a full
+menu bar is no dead end.
+
+The menu shows the connection state, your last messages (unread count next to the bell; **Recent** starts with
+**Copy Latest Message** and **Open Latest Link**), **Send Clipboard**, **Publish…**, **Mark All Read**,
+**Dismiss All Popups**, **Pause Notifications** and **History…**. While notifications are paused the bell is crossed out.
+Removing a rule or a server, or uninstalling a plugin, asks first.
 
 ### Publish
 
@@ -221,7 +228,7 @@ brew uninstall --cask ntfybar
 ```
 
 Then remove its data if you like: `~/Library/Application Support/NtfyBar/`
-(`brew uninstall --zap --cask ntfybar` does this for you). If you enabled **Launch at login**,
+(`brew uninstall --zap --cask ntfybar` does this for you). If you turned on **Open at Login**,
 switch it off first in Settings › General.
 
 ## Feature requests and contributions

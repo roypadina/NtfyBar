@@ -21,9 +21,18 @@ enum SettingsOpener {
     /// is why `NSWindow Frame com_apple_SwiftUI_Settings_window` shows up in the app's defaults.
     private static let windowIdentifier = "com_apple_SwiftUI_Settings_window"
 
+    /// The action captured by the always-alive menu-bar label, for callers that have no environment
+    /// (reopen from Finder, the Welcome window).
+    static var action: OpenSettingsAction?
+
+    static func open() {
+        if let action { open(using: action) }
+    }
+
     /// `openSettings` is an environment action, so the caller has to hand it over.
     static func open(using openSettings: OpenSettingsAction) {
-        NSApp.activate()
+        action = openSettings
+        AccessoryWindows.shared.becomeRegular()
         openSettings()
         // The window is created during openSettings(), but ordering it front has to wait for
         // the activation to land — on the same runloop turn it is still behind other apps.

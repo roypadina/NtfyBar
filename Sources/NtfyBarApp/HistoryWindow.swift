@@ -13,9 +13,13 @@ import SwiftUI
             w.setContentSize(NSSize(width: 640, height: 520))
             w.center()
             window = w
+            // Release on close: a kept-alive window's view keeps reloading on every new message.
+            Task { @MainActor in
+                for await _ in NotificationCenter.default.notifications(named: NSWindow.willCloseNotification, object: w) { break }
+                if window === w { window = nil }
+            }
         }
-        NSApp.activate(ignoringOtherApps: true)
-        window?.makeKeyAndOrderFront(nil)
+        if let window { AccessoryWindows.shared.show(window) }
     }
 }
 

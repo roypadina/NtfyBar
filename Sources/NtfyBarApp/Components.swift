@@ -16,8 +16,9 @@ struct SidebarPane<Rows: View, Extra: View>: View {
             List(selection: $selection) { rows() }
             Divider()
             HStack(spacing: 4) {
-                Button(action: onAdd) { Image(systemName: "plus") }
-                Button(action: onRemove) { Image(systemName: "minus") }.disabled(removeDisabled).help(removeHelp)
+                Button(action: onAdd) { Image(systemName: "plus") }.help("Add").accessibilityLabel("Add")
+                Button(action: onRemove) { Image(systemName: "minus") }.disabled(removeDisabled)
+                    .help(removeHelp.isEmpty ? "Remove" : removeHelp).accessibilityLabel("Remove")
                 extraButtons()
                 Spacer()
             }
@@ -117,7 +118,7 @@ struct FormFooter: View {
     }
 
     var body: some View {
-        Text(text).font(.subheadline).foregroundStyle(warning ? .orange : .secondary)
+        Text(text).font(.subheadline).foregroundStyle(warning ? Theme.warning : Color.secondary)
             .multilineTextAlignment(.leading).frame(maxWidth: .infinity, alignment: .leading)
     }
 }

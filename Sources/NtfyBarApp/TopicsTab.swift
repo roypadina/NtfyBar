@@ -429,7 +429,7 @@ struct TopicEditor: View {
                 try await engine.publish(req, rateKey: "test")
                 status = "Sent"
             } catch {
-                status = "Failed: \(String(describing: error))"
+                status = "Couldn't send: " + ((error as? PublishError)?.reason ?? error.localizedDescription)
             }
         }
     }

@@ -5,8 +5,8 @@ import UserNotifications
 struct SettingsView: View {
     let model: AppModel
     let engine: Engine
-    var initialTab = "general"
-    @State private var tab = ""
+    var initialTab: String?  // only the Renderer sets it
+    @AppStorage("settingsTab") private var tab = "general"  // reopen on the last tab (SET-3)
 
     var body: some View {
         TabView(selection: $tab) {
@@ -17,14 +17,14 @@ struct SettingsView: View {
             ServersTab(engine: engine)
                 .tabItem { Label("Servers", systemImage: "server.rack") }.tag("servers")
             RulesTab(engine: engine)
-                .tabItem { Label("Rules", systemImage: "bolt.fill") }.tag("rules")
+                .tabItem { Label("Rules", systemImage: "bolt") }.tag("rules")
             PluginsTab(model: model, engine: engine)
-                .tabItem { Label("Plugins", systemImage: "puzzlepiece.extension.fill") }.tag("plugins")
+                .tabItem { Label("Plugins", systemImage: "puzzlepiece.extension") }.tag("plugins")
             AboutTab()
                 .tabItem { Label("About", systemImage: "info.circle") }.tag("about")
         }
         .frame(minWidth: 820, idealWidth: 900, minHeight: 640, idealHeight: 720)
-        .onAppear { if tab.isEmpty { tab = initialTab } }
+        .onAppear { if let initialTab { tab = initialTab } }
     }
 }
 
@@ -45,12 +45,7 @@ struct GeneralTab: View {
     var body: some View {
         Form {
             Section("Startup") {
-                Toggle("Launch NtfyBar at login", isOn: Binding(
-                    get: { engine.config.launchAtLogin },
-                    set: { on in
-                        try? LoginItemManager().setEnabled(on)
-                        try? engine.update { $0.launchAtLogin = on }
-                    }))
+                LaunchAtLoginToggle()
             }
             Section("Notifications") {
                 LabeledContent("macOS notifications") {
@@ -90,6 +85,10 @@ struct GeneralTab: View {
                         TextField("End", text: $end, prompt: Text("09:00")).labelsHidden().textFieldStyle(.roundedBorder)
                             .frame(width: 64).multilineTextAlignment(.center)
                     }
+                }
+                if !validTimes {
+                    Label("Use 24-hour HH:MM, for example 20:00. Not saved yet.", systemImage: "exclamationmark.triangle")
+                        .foregroundStyle(Theme.warning)
                 }
                 Picker("Highest priority during quiet hours", selection: configBinding(engine, \.quietHours.maxPriority)) {
                     ForEach(1...5, id: \.self) { p in Text(PopupContent.priorityInfo(p).word).tag(p) }
@@ -148,10 +147,11 @@ struct ServersTab: View {
     let engine: Engine
     @State private var selection: UUID?
     @State private var draft: ServerConfig?
+    @State private var confirmRemove = false
 
     var body: some View {
         HStack(spacing: 0) {
-            SidebarPane(selection: $selection, onAdd: { draft = ServerConfig(url: "https://"); selection = nil }, onRemove: remove,
+            SidebarPane(selection: $selection, onAdd: { draft = ServerConfig(url: "https://"); selection = nil }, onRemove: { confirmRemove = true },
                         removeDisabled: selection == nil || engine.config.topics.contains { $0.serverId == selection },
                         removeHelp: "A server still used by a topic can't be removed") {
                 ForEach(engine.config.servers) { s in
@@ -166,12 +166,18 @@ struct ServersTab: View {
                 }
                 .id("new")
             } else if let id = selection, let server = engine.config.server(id) {
-                ServerEditor(engine: engine, draft: server, isNew: false, onRemove: { remove() }) { _ in }.id(id)
+                ServerEditor(engine: engine, draft: server, isNew: false, onRemove: { confirmRemove = true }) { _ in }.id(id)
             } else {
                 EmptyState(icon: "server.rack", title: "Select a server", caption: "Add your own ntfy server with +. ntfy.sh is built in.")
             }
         }
         .onAppear { if selection == nil { selection = engine.config.servers.first?.id } }
+        .alert("Remove this server?", isPresented: $confirmRemove) {
+            Button("Remove", role: .destructive) { remove() }
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text("Its address and sign-in details are deleted from NtfyBar.")
+        }
     }
 
     private func authKind(_ auth: ServerAuth) -> String {
@@ -196,7 +202,6 @@ struct ServerEditor: View {
     var onRemove: (() -> Void)? = nil
     let onDone: (UUID?) -> Void
     @State private var authType = "none"
-    @State private var confirmRemove = false
     @State private var user = ""
     @State private var pass = ""
     @State private var token = ""
@@ -232,19 +237,13 @@ struct ServerEditor: View {
         } leading: {
             if onRemove != nil {
                 let inUse = engine.config.topics.contains { $0.serverId == draft.id }
-                Button("Remove Server…", role: .destructive) { confirmRemove = true }
+                Button("Remove Server…", role: .destructive) { onRemove?() }
                     .disabled(inUse)
                     .help(inUse ? "Remove or move its topics first" : "")
             }
         } trailing: {
             if let error { Text(error).foregroundStyle(.red).lineLimit(1) }
             Button("Save", action: save).keyboardShortcut(.defaultAction)
-        }
-        .alert("Remove this server?", isPresented: $confirmRemove) {
-            Button("Remove", role: .destructive) { onRemove?() }
-            Button("Cancel", role: .cancel) {}
-        } message: {
-            Text("Its address and sign-in details are deleted from NtfyBar.")
         }
         .onAppear {
             switch draft.auth {
@@ -276,12 +275,13 @@ struct AboutTab: View {
 
     var body: some View {
         VStack(spacing: 10) {
-            Image(nsImage: NSApp.applicationIconImage).resizable().frame(width: 64, height: 64)
+            Image(nsImage: NSApp.applicationIconImage).resizable().frame(width: 64, height: 64).accessibilityHidden(true)
             Text("NtfyBar").font(.title2.bold())
             Text("Version \(info["CFBundleShortVersionString"] as? String ?? "dev") (\(info["CFBundleVersion"] as? String ?? "dev"))")
                 .foregroundStyle(.secondary)
             HStack {
                 Button("About NtfyBar…") { AboutWindow.show() }
+                Button("Welcome Guide…") { WelcomeWindow.show() }
                 Button("Support on Ko-fi ☕") { NSWorkspace.shared.open(NtfyBarApp.koFiURL) }.buttonStyle(.borderedProminent)
             }
             .controlSize(.large).padding(.top, 4)

@@ -27,6 +27,7 @@ struct PluginsTab: View {
     let engine: Engine
     @State private var section = "installed"
     @State private var consent: ConsentRequest?
+    @State private var uninstalling: PluginManager.Package?
     @State private var available: [(source: String, entry: MarketplaceEntry)] = []
     @State private var busy = false
     @State private var status: String?
@@ -52,6 +53,14 @@ struct PluginsTab: View {
         }
         .sheet(item: $consent) { req in
             ConsentSheet(request: req, onAllow: { allow(req) }, onCancel: { consent = nil })
+        }
+        .confirmationDialog(uninstalling.map { "Uninstall \($0.manifest?.name ?? $0.id)?" } ?? "Uninstall?",
+                            isPresented: Binding(get: { uninstalling != nil }, set: { if !$0 { uninstalling = nil } }),
+                            titleVisibility: .visible, presenting: uninstalling) { pkg in
+            Button("Uninstall", role: .destructive) { try? engine.uninstallPlugin(pkg.id) }
+            Button("Cancel", role: .cancel) {}
+        } message: { _ in
+            Text("Its saved data and permissions are removed. You can install it again from Available.")
         }
     }
 
@@ -117,7 +126,7 @@ struct PluginsTab: View {
                 if !pkg.verified { Pill("Unverified", tint: .orange, icon: "exclamationmark.shield") }
                 Spacer()
                 if pkg.source == .installed {
-                    Button(role: .destructive) { try? engine.uninstallPlugin(pkg.id) } label: {
+                    Button(role: .destructive) { uninstalling = pkg } label: {
                         Label("Uninstall", systemImage: "trash").font(.caption)
                     }
                     .buttonStyle(.borderless)
@@ -201,18 +210,20 @@ struct PluginsTab: View {
         let urls = engine.config.plugins.marketplaces
         Task { @MainActor in
             var found: [(String, MarketplaceEntry)] = []
-            var failures = 0
+            var failures: [String] = []
             for text in urls {
-                guard let url = URL(string: text) else { failures += 1; continue }
+                guard let url = URL(string: text) else { failures.append("Couldn't load \(text): not a valid URL"); continue }
                 do {
                     let index = try await Marketplace.fetchIndex(url, session: EffectPerformer.actionSession)
                     found += index.plugins.map { (text, $0) }
                 } catch {
-                    failures += 1
+                    let reason = (error as? MarketplaceError).map { String(describing: $0) } ?? error.localizedDescription
+                    failures.append("Couldn't load \(url.host() ?? text): \(reason)")
                 }
             }
             available = found
-            status = failures > 0 ? "\(failures) marketplace(s) could not be loaded." : "\(found.count) plugin(s) available."
+            status = failures.first.map { $0 + (failures.count > 1 ? " (\(failures.count - 1) more failed)" : "") }
+                ?? "\(found.count) plugin\(found.count == 1 ? "" : "s") available."
             busy = false
         }
     }
@@ -309,7 +320,7 @@ struct PluginsTab: View {
         panel.canChooseFiles = false
         panel.allowsMultipleSelection = false
         panel.prompt = "Add"
-        NSApp.activate(ignoringOtherApps: true)
+        NSApp.activate()
         guard panel.runModal() == .OK, let url = panel.url else { return }
         updateFolders { if !$0.contains(url.path) { $0.append(url.path) } }
     }

@@ -12,6 +12,7 @@ final class AppModel {
     private(set) lazy var performer = EffectPerformer(model: self)
     let isTestMode = ProcessInfo.processInfo.environment["NTFYBAR_TEST"] == "1"
     private var started = false
+    private var resumeTask: Task<Void, Never>?
 
     private init() {
         do {
@@ -41,15 +42,31 @@ final class AppModel {
         engine.start()
         engine.startNetworkMonitoring()
         engine.startWatchingFiles()
+        scheduleResume()
         NSWorkspace.shared.notificationCenter.addObserver(forName: NSWorkspace.didWakeNotification, object: nil,
                                                           queue: .main) { [weak self] _ in
             MainActor.assumeIsolated { self?.engine.reconnectAll() }
         }
-        registerLoginItemOnce()
     }
 
     func pause(until date: Date?) {
         try? engine.update { $0.pausedUntil = date }
+        scheduleResume()
+    }
+
+    /// A timed pause ends without a state change; clear it then, so the status icon (which watches the config) goes back to the bell.
+    /// Called on every change of `pausedUntil` (menu, reload, external edit). The config file stores whole seconds, so the
+    /// check is "expired", not "unchanged", and the extra second covers that rounding.
+    func scheduleResume() {
+        resumeTask?.cancel()
+        guard let until = engine.config.pausedUntil, until != .distantFuture, until > Date() else { return }
+        resumeTask = Task { [weak self] in
+            try? await Task.sleep(for: .seconds(until.timeIntervalSinceNow + 1))
+            guard !Task.isCancelled, let self else { return }
+            self.engine.reloadIfChangedOnDisk()  // don't overwrite an external edit the 2 s poll hasn't read yet
+            guard let p = self.engine.config.pausedUntil, p != .distantFuture, p <= Date() else { return }
+            try? self.engine.update { $0.pausedUntil = nil }
+        }
     }
 
     func label(for topicId: UUID) -> String {
@@ -146,19 +163,6 @@ final class AppModel {
             PopupPanel.relayout()
         }
     }
-
-    /// Registered once, and only for the installed copy: a dev build in dist/ must never become
-    /// the login item.
-    private func registerLoginItemOnce() {
-        let config = engine.config
-        guard !isTestMode, !config.didRegisterLoginItem, Bundle.main.bundlePath.hasPrefix("/Applications/") else { return }
-        do {
-            try LoginItemManager().setEnabled(config.launchAtLogin)
-        } catch {
-            Log.app.error("login item: \(error.localizedDescription, privacy: .public)")
-        }
-        try? engine.update { $0.didRegisterLoginItem = true }
-    }
 }
 
 final class AppDelegate: NSObject, NSApplicationDelegate {
@@ -173,13 +177,23 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
     }
 
+    /// Opening the app again (Finder, Raycast) while its icon is hidden by the notch or a full menu bar.
+    @MainActor
+    func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows flag: Bool) -> Bool {
+        if !flag { SettingsOpener.open() }
+        return false  // true lets SwiftUI also open its Settings scene, empty (PullPing 0.1.2 gotcha)
+    }
+
     func applicationDidFinishLaunching(_ notification: Notification) {
         NSApplication.shared.setActivationPolicy(.accessory)
         ensureEditMenu()
         // Live subscriptions must not be napped.
         activity = ProcessInfo.processInfo.beginActivity(options: [.userInitiatedAllowingIdleSystemSleep],
                                                          reason: "Live ntfy subscriptions")
-        MainActor.assumeIsolated { AppModel.shared.start() }
+        MainActor.assumeIsolated {
+            AppModel.shared.start()
+            if !AppModel.shared.isTestMode { WelcomeWindow.showOnce() }
+        }
     }
 
     /// An accessory app only gets ⌘C/⌘V/⌘X/⌘A in text fields when the main menu has these items.
