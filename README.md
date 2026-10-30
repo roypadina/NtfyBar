@@ -16,6 +16,10 @@
 [![Ko-fi](https://img.shields.io/badge/Ko--fi-support-F16061?logo=ko-fi&logoColor=white)](https://ko-fi.com/roypadina)
 [![PRs welcome](https://img.shields.io/badge/PRs-welcome-brightgreen)](CONTRIBUTING.md)
 
+<br>
+
+<img src="docs/demo.gif" alt="NtfyBar in action: a curl command sends an urgent message, a popup appears and stays until you copy or dismiss it, and the menu-bar menu keeps recent messages one click away." width="720">
+
 <img src="docs/screenshots/popup.png" width="520" alt="An NtfyBar popup: urgent priority, title, markdown text and buttons">
 
 </div>
