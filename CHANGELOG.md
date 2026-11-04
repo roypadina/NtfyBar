@@ -6,6 +6,11 @@ uses [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [1.6.0] - 2026-11-04
+
+### Added
+- Updates from inside the app. NtfyBar asks once, on its second launch, whether to check for updates automatically; with your yes it checks once a day (downloading the release feed from GitHub, which sends nothing about you) and asks before installing a new version. Tick "Automatically download and install updates" in that prompt to skip the question next time. Check by hand with **Check for Updates…** in the About window or Settings › About. Updates are signed, and installing one this way needs no `xattr` step.
+
 ## [1.5.0] - 2026-10-30
 
 ### Added

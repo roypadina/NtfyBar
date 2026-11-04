@@ -279,6 +279,7 @@ struct AboutTab: View {
             Text("NtfyBar").font(.title2.bold())
             Text("Version \(info["CFBundleShortVersionString"] as? String ?? "dev") (\(info["CFBundleVersion"] as? String ?? "dev"))")
                 .foregroundStyle(.secondary)
+            Button("Check for Updates…") { Updates.check() }
             HStack {
                 Button("About NtfyBar…") { AboutWindow.show() }
                 Button("Welcome Guide…") { WelcomeWindow.show() }
