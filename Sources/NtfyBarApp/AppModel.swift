@@ -187,6 +187,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     func applicationDidFinishLaunching(_ notification: Notification) {
         NSApplication.shared.setActivationPolicy(.accessory)
         ensureEditMenu()
+        // Sparkle asks on the second launch before any check; never in test runs or a bare `swift run`.
+        if !AppModel.shared.isTestMode, Bundle.main.bundleIdentifier != nil { _ = Updates.controller }
         // Live subscriptions must not be napped.
         activity = ProcessInfo.processInfo.beginActivity(options: [.userInitiatedAllowingIdleSystemSleep],
                                                          reason: "Live ntfy subscriptions")

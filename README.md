@@ -38,7 +38,7 @@ a copy to the clipboard, a shell command, or rules and plugins.
 - **Plugins** — JavaScript conditions, actions and popups in a sandbox with permissions you approve one by one ([marketplace](https://github.com/roypadina/NtfyBar-Plugins)).
 - **History** — every message, searchable, per topic, with read/unread.
 - **Calm by design** — flood guard (a burst of messages becomes one notice and one counting popup), pause for 15 min / 1 h / until resumed, quiet hours for anything NtfyBar sends.
-- **Private** — no account, no telemetry, no update checks; everything stays on your Mac.
+- **Private** — no account, no telemetry; everything stays on your Mac. NtfyBar asks once (on its second launch) whether to check for updates automatically; with your yes it checks once a day by downloading the release feed from GitHub, which sends nothing about you.
 
 <p align="center">
   <img src="docs/screenshots/settings-topics.png" width="400" alt="Settings: a topic and what happens when a message arrives">
@@ -65,6 +65,12 @@ NtfyBar in `/Applications` and choose **Open**, or run once:
 ```sh
 xattr -dr com.apple.quarantine "/Applications/NtfyBar.app"
 ```
+
+### Updating
+
+NtfyBar asks once whether to check for updates automatically; with your yes it checks once a day and asks before
+installing a new version (**Check for Updates…** in the About window or Settings → About checks now). An in-app update needs no `xattr` step. Homebrew users can also run
+`brew upgrade --cask ntfybar`.
 
 ### Build from source
 
@@ -215,7 +221,7 @@ NtfyBar needs no Accessibility, Full Disk or other special access.
 
 - **Local only.** Settings live in `~/Library/Application Support/NtfyBar/` (folder readable only by you, files mode 600): `config.json` (topics, servers and their credentials), `rules.json`, `state.json` and `history.sqlite`. Message history is stored **unencrypted** there.
 - **Topics are passwords.** On a public server anyone who knows a topic name can read and post to it. Use long random names (Settings has a **Random** button), and see the [ntfy docs](https://docs.ntfy.sh/publish/#message-caching) — ntfy.sh keeps messages for up to 12 hours.
-- **No telemetry, no analytics, no update checks.** NtfyBar connects only to the servers you configure, and to plugin marketplaces when you press Refresh or Install.
+- **No telemetry, no analytics.** NtfyBar connects only to the servers you configure, to plugin marketplaces when you press Refresh or Install, and to GitHub for update checks only if you allowed them when asked (or press **Check for Updates…**).
 - Topic names appear only in the topic editor and the config file; menus, popups, logs and plugins see your labels.
 - Plugins: see [Plugins](#plugins) for what they can and can't do. Hiding topic names and server addresses from plugins is best-effort (text replacement — a sender who encodes them defeats it), and a plugin allowed to open links can send message text to a website in the URL. Grant permissions only to plugins you trust.
 
