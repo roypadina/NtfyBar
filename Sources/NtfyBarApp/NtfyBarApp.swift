@@ -95,6 +95,7 @@ struct MenuContent: View {
 
         Divider()
 
+        Button(Updates.menuTitle) { Updates.check() }
         OpenSettingsButton()
 
         Divider()
