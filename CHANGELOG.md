@@ -6,6 +6,8 @@ uses [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [1.6.1] - 2026-11-04
+
 ### Added
 - **Check for Updates…** (or **Install Update X.Y.Z…** once one is found) in the menu-bar menu.
 
