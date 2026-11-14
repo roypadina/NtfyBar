@@ -127,7 +127,7 @@ public final class Dispatcher {
         }
     }
 
-    private static func isAlert(_ e: Effect) -> Bool {
+    static func isAlert(_ e: Effect) -> Bool {
         switch e {
         case .popup, .pluginPopup, .notify: true
         default: false

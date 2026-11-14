@@ -122,6 +122,7 @@ final class EngineStreamTests {
         #expect(StubProtocol.requests(host)[safe: 0]?.url?.query == "since=300")
         #expect(e.recent.first?.isCatchUp == true)
         #expect(notified.isEmpty)
+        #expect(e.supportPrompt.delivered == 0, "catch-up shown as a summary only is not counted")
     }
 
     @Test func keepaliveTimeoutReconnects() async throws {
@@ -147,6 +148,7 @@ final class EngineStreamTests {
         try await Task.sleep(for: .milliseconds(200))
         #expect(notified == ["d1"])
         #expect(e.unreadCount == 1)
+        #expect(e.supportPrompt.delivered == 1, "a replayed duplicate is not delivered twice")
     }
 
     @Test func redirectIsTerminalAndNotFollowed() async throws {

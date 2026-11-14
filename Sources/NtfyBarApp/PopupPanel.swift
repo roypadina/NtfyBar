@@ -44,6 +44,7 @@ enum PopupPanel {
     static var count: Int { active.count }
 
     static func show(_ content: PopupContent, perform: @escaping Perform) {
+        SupportPanel.interrupt()  // a Ko-fi card still open counts as "Ask me in 2 weeks"
         if let i = active.firstIndex(where: { $0.key == content.key }) {
             active[i].state.content = content  // e.g. flood counter, plugin reply
             active[i].panel.orderFrontRegardless()

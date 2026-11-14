@@ -9,6 +9,7 @@ final class AppModel {
 
     let engine: Engine
     let notifier = Notifier()
+    let support: SupportPrompt  // the Ko-fi card's timing (SupportPrompt.swift)
     private(set) lazy var performer = EffectPerformer(model: self)
     let isTestMode = ProcessInfo.processInfo.environment["NTFYBAR_TEST"] == "1"
     private var started = false
@@ -25,6 +26,7 @@ final class AppModel {
             alert.runModal()
             exit(1)
         }
+        support = SupportPrompt(engine: engine)
     }
 
     func start() {
@@ -43,6 +45,7 @@ final class AppModel {
         engine.startNetworkMonitoring()
         engine.startWatchingFiles()
         scheduleResume()
+        support.start()
         NSWorkspace.shared.notificationCenter.addObserver(forName: NSWorkspace.didWakeNotification, object: nil,
                                                           queue: .main) { [weak self] _ in
             MainActor.assumeIsolated { self?.engine.reconnectAll() }

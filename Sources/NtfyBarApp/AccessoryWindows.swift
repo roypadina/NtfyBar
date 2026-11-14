@@ -20,6 +20,7 @@ final class AccessoryWindows {
     }
 
     func becomeRegular() {
+        SupportPanel.interrupt()  // every window opens through here: a Ko-fi card still open counts as "Ask me in 2 weeks"
         NSApp.setActivationPolicy(.regular)
         NSApp.activate()
     }

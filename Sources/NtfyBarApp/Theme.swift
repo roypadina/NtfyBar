@@ -2,10 +2,18 @@ import AppKit
 import NtfyBarCore
 import SwiftUI
 
-/// One dynamic colour from a light/dark pair — same mechanism the system uses for semantic colours,
-/// so every Color below flips with the appearance automatically (no @Environment plumbing).
-private func dyn(light: NSColor, dark: NSColor) -> Color {
-    Color(nsColor: NSColor(name: nil) { $0.bestMatch(from: [.aqua, .darkAqua]) == .darkAqua ? dark : light })
+/// One dynamic colour from a light/dark pair (plus optional Increase Contrast variants) — same mechanism
+/// the system uses for semantic colours, so every Color below flips with the appearance automatically
+/// (no @Environment plumbing).
+private func dyn(light: NSColor, dark: NSColor, hcLight: NSColor? = nil, hcDark: NSColor? = nil) -> Color {
+    Color(nsColor: NSColor(name: nil) {
+        switch $0.bestMatch(from: [.aqua, .darkAqua, .accessibilityHighContrastAqua, .accessibilityHighContrastDarkAqua]) {
+        case .darkAqua: dark
+        case .accessibilityHighContrastAqua: hcLight ?? light
+        case .accessibilityHighContrastDarkAqua: hcDark ?? dark
+        default: light
+        }
+    })
 }
 
 /// Popup look (MeetAlert palette): one signal hue per accent, ink base over material.
@@ -23,6 +31,12 @@ enum Theme {
                               dark: NSColor(red: 1.00, green: 0.35, blue: 0.31, alpha: 1))  // #FF5A4E  5.5:1 on ink
     static let success = dyn(light: NSColor(red: 0.10, green: 0.45, blue: 0.20, alpha: 1),  // #1A7333  5.9:1 on white
                              dark: NSColor(red: 0.35, green: 0.85, blue: 0.48, alpha: 1))   // #59D97A 10.0:1 on ink
+    /// Ko-fi red for the support card. White on #FF5E5B is only 3.0:1, so dark mode keeps the brand red
+    /// with ink text (6.3:1), light mode deepens it for white (5.4:1).
+    static let kofi = dyn(light: NSColor(red: 0.78, green: 0.19, blue: 0.18, alpha: 1),   // #C8302D
+                          dark: NSColor(red: 1.00, green: 0.37, blue: 0.36, alpha: 1),    // #FF5E5B
+                          hcLight: NSColor(red: 0.64, green: 0.14, blue: 0.13, alpha: 1), // #A32320
+                          hcDark: NSColor(red: 1.00, green: 0.53, blue: 0.51, alpha: 1))  // #FF8783
     /// Ink text on the bright dark-mode fills, white on the deep light-mode fills.
     static let onSignal = dyn(light: .white, dark: NSColor(red: 0.05, green: 0.07, blue: 0.13, alpha: 1))
 

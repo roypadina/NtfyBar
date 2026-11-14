@@ -1,10 +1,20 @@
 import Foundation
 
-/// Per-server stream bookmark: the newest message time seen, so reconnects ask for `since=<it>`.
+/// state.json. Per-server stream bookmark: the newest message time seen, so reconnects ask for `since=<it>`.
+/// Plus the Ko-fi ask's bookkeeping.
 public struct StreamState: Codable, Equatable, Sendable {
     public var lastEventTime: [String: Int64] = [:]  // server id (uuidString) → unix seconds
+    public var supportPrompt = SupportPromptState()
 
     public init() {}
+
+    // Tolerant decode: a synthesized decoder throws on a missing key, and load() would then move
+    // a 1.6 state.json aside — losing the stream cursor.
+    public init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        lastEventTime = try c.decodeIfPresent([String: Int64].self, forKey: .lastEventTime) ?? [:]
+        supportPrompt = try c.decodeIfPresent(SupportPromptState.self, forKey: .supportPrompt) ?? SupportPromptState()
+    }
 }
 
 /// Files under one directory (mode 700), each written atomically with mode 600: topics and

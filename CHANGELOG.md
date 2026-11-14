@@ -6,6 +6,11 @@ uses [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [1.7.0] - 2026-11-14
+
+### Added
+- Ko-fi support card: about 5 seconds after you handle a NtfyBar notification (a popup button, a dismissed popup or a clicked banner), a small receipt card may ask for a tip. It waits until 7 days after you install or update, and until NtfyBar has delivered more than 100 notifications as a banner or popup (counting starts with this update). It asks at most 3 times a year, and never after a high-priority or urgent message, while messages are still arriving, while your microphone is in use, while another NtfyBar popup or window is open, or while you are away. "Ask me in 2 weeks" snoozes it. "Nope, don't ask again" keeps it quiet until the next major version, and for at least 90 days. A tip keeps it quiet for 180 days. A card still open when a new popup or a NtfyBar window opens closes and counts as a snooze. An unanswered card fades after 5 minutes and counts as a snooze. The card never takes keyboard focus, and the same three choices are in the menu for keyboard and VoiceOver users. Hold ⌥ in the menu for "Show Support Prompt Now" to preview it (macOS 15 or later).
+
 ## [1.6.1] - 2026-11-04
 
 ### Added
