@@ -46,6 +46,7 @@ enum SettingsOpener {
         if let window = settingsWindow() {
             window.makeKeyAndOrderFront(nil)
             window.orderFrontRegardless()
+            AccessoryWindows.shared.keepFront(window)
             log.info("settings window surfaced on attempt \(attempt)")
             return
         }
