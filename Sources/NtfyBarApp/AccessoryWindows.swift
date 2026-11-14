@@ -22,7 +22,8 @@ final class AccessoryWindows {
     func becomeRegular() {
         SupportPanel.interrupt()  // every window opens through here: a Ko-fi card still open counts as "Ask me in 2 weeks"
         NSApp.setActivationPolicy(.regular)
-        NSApp.activate()
+        // Forceful: a user action, and on macOS 14+ the front app can refuse the activate() request (window opens behind).
+        NSApp.activate(ignoringOtherApps: true)
     }
 
     private func windowWillClose(_ closing: NSWindow?) {
