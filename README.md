@@ -265,6 +265,8 @@ NtfyBar is free and open source. If it saves you time, a coffee keeps the next o
 
 [![Support me on Ko-fi](https://ko-fi.com/img/githubbutton_sm.svg)](https://ko-fi.com/roypadina)
 
+Once in a while, NtfyBar asks too. A small receipt card shows up a few seconds after you handle a notification. It only appears after NtfyBar has delivered more than 100 notifications, and at most 3 times a year. "Ask me in 2 weeks" snoozes it, and "Nope, don't ask again" keeps it away until the next major version. It never shows after a high-priority or urgent message or over another NtfyBar popup, and never takes keyboard focus. An unanswered card fades after 5 minutes and counts as "Ask me in 2 weeks".
+
 ## License
 
 [MIT](LICENSE) © Roy Padina. ntfy tag emoji list from [ntfy](https://github.com/binwiederhier/ntfy)

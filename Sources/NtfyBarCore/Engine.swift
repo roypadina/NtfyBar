@@ -527,6 +527,10 @@ public final class Engine {
 
     private func dispatch(_ m: Message) {
         let effects = dispatcher.handle(m, config: config, now: now())
+        if effects.contains(where: Dispatcher.isAlert) {  // shown as a banner or popup: the Ko-fi card's count
+            state.supportPrompt.delivered += 1
+            saveStateSoon()
+        }
         if !effects.isEmpty { onEffects?(effects) }
         if dispatcher.hasPendingCatchUp { scheduleCatchUpFlush() }
     }
@@ -542,12 +546,22 @@ public final class Engine {
         let key = serverId.uuidString
         guard time > state.lastEventTime[key] ?? 0 else { return }
         state.lastEventTime[key] = time
-        // Debounced: a 500-message replay must not mean 500 file writes.
+        saveStateSoon()
+    }
+
+    /// Debounced: a 500-message replay must not mean 500 file writes.
+    private func saveStateSoon() {
         guard stateSaveTask == nil else { return }
         stateSaveTask = Task { [weak self] in
             try? await Task.sleep(for: .seconds(5))
             self?.saveState()
         }
+    }
+
+    /// Ko-fi ask bookkeeping in state.json. The app writes it at user pace, so a write saves at once.
+    public var supportPrompt: SupportPromptState {
+        get { state.supportPrompt }
+        set { state.supportPrompt = newValue; saveState() }
     }
 
     public func saveState() {

@@ -120,13 +120,22 @@ final class EffectPerformer {
                 model.engine.markRead(m)
             }
         }
+        // The Ko-fi card's moment (SupportPrompt.swift): the user handled this message's popup.
+        let handled = { [model] (action: Bool) in
+            if let topicId = content.topicId, let id = content.messageId,
+               let m = model.engine.history.message(topicId: topicId, id: id) {
+                model.support.handled(m, action: action)
+            }
+        }
         switch button.action {
         case let .open(url):
             open(url.absoluteString)
             markRead()
+            handled(true)
             PopupPanel.dismiss(state)
         case let .copy(text):
             copy(text)
+            handled(true)
             flash(button.id, in: state)
         case let .attachment(copyIt):
             guard let topicId = content.topicId, let id = content.messageId,
@@ -135,6 +144,7 @@ final class EffectPerformer {
                 do {
                     let file = try await attachmentFile(m)
                     if copyIt { copyFile(file, type: m.ntfy.attachment?.type) }
+                    handled(true)
                     flash(button.id, in: state)
                 } catch {
                     Log.app.error("attachment: \(error.localizedDescription, privacy: .public)")
@@ -142,6 +152,7 @@ final class EffectPerformer {
                 }
             }
         case .attachmentFolder:
+            handled(true)
             let saved = content.topicId.flatMap { t in content.messageId.map { savedFiles["\(t.uuidString)/\($0)"] } } ?? nil
             switch AttachmentFile.folderAction(saved: saved) {
             case let .reveal(file): NSWorkspace.shared.activateFileViewerSelecting([file])
@@ -151,6 +162,7 @@ final class EffectPerformer {
             }
         case .dismiss:
             markRead()
+            handled(false)
             PopupPanel.dismiss(state)
         case .showHistory:
             HistoryWindow.show(model: model)
@@ -160,12 +172,14 @@ final class EffectPerformer {
                 let ok = await HTTPAction.perform(action, session: Self.actionSession)
                 if ok {
                     markRead()
+                    handled(true)
                     if button.clears { PopupPanel.dismiss(state) } else { flash(button.id, in: state) }
                 } else {
                     state.failed = button.id
                 }
             }
         case let .plugin(buttonId):
+            handled(true)
             model.pluginPopupAction(buttonId, state: state)
         }
     }

@@ -33,7 +33,7 @@ body:
     id: version
     attributes:
       label: NtfyBar version and install method
-      placeholder: "1.0.0, Homebrew"
+      placeholder: "1.7.0, Homebrew"
     validations:
       required: true
   - type: dropdown

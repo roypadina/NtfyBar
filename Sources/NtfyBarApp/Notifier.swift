@@ -102,6 +102,7 @@ final class Notifier: NSObject, ObservableObject, UNUserNotificationCenterDelega
         }
         guard let topicId, let id, let m = model.engine.history.message(topicId: topicId, id: id) else { return }
         model.engine.markRead(m)
+        model.support.handled(m, action: true)
         switch action {
         case "copy":
             model.performer.copy(m.body)
