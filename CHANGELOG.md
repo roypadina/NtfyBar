@@ -6,6 +6,11 @@ uses [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [1.7.2] - 2026-11-15
+
+### Fixed
+- No longer takes focus back from another app you clicked into right after opening a window.
+
 ## [1.7.1] - 2026-11-15
 
 ### Fixed
