@@ -6,6 +6,12 @@ uses [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [1.7.1] - 2026-11-15
+
+### Fixed
+- On macOS 14 and later, Settings, About, Welcome, History and Publish windows opened from the menu bar come to the front and stay there, instead of opening behind the app you were using.
+- Check for Updates… brings the update window to the front.
+
 ## [1.7.0] - 2026-11-14
 
 ### Added
